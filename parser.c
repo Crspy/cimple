@@ -24,40 +24,38 @@ static Obj *find_var(const Token *tok)
   return NULL;
 }
 
-static Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
+static Node *new_node(NodeKind kind)
 {
-  Node *node = malloc(sizeof(Node));
+  Node *node = calloc(1, sizeof(Node)); // Node must be zero initialized
   node->kind = kind;
-  node->next = NULL;
-  node->lhs = lhs;
-  node->rhs = rhs;
-  node->body = NULL;
-  node->var = NULL;
   return node;
 }
 
 static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs)
 {
-  Node *node = new_node(kind, lhs, rhs);
+  Node *node = new_node(kind);
+  node->lhs = lhs;
+  node->rhs = rhs;
   return node;
 }
 
 static Node *new_unary(NodeKind kind, Node *expr)
 {
-  Node *node = new_node(kind, expr, NULL);
+  Node *node = new_node(kind);
+  node->lhs = expr;
   return node;
 }
 
 static Node *new_num(int val)
 {
-  Node *node = new_node(ND_NUM, NULL, NULL);
+  Node *node = new_node(ND_NUM);
   node->val = val;
   return node;
 }
 
 static Node *new_var_node(Obj *var)
 {
-  Node *node = new_node(ND_VAR, NULL, NULL);
+  Node *node = new_node(ND_VAR);
   node->var = var;
   return node;
 }
@@ -73,6 +71,9 @@ static Obj *new_lvar(const char *name, int len)
 }
 
 // stmt = "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
+//      | "while" "(" expr ")" stmt
 //      | "{" compound-stmt
 //      | expr-stmt
 static Node *stmt(const Token **rest, const Token *tok)
@@ -83,6 +84,50 @@ static Node *stmt(const Token **rest, const Token *tok)
     *rest = consume(tok, ";");
     return node;
   }
+
+  if (equal(tok, "if"))
+  {
+    Node *node = new_node(ND_IF);
+    tok = consume(tok->next, "(");
+    node->cond_expr = expr(&tok, tok);
+    tok = consume(tok, ")");
+    node->then_stmt = stmt(&tok, tok);
+    if (equal(tok, "else"))
+      node->else_stmt = stmt(&tok, tok->next);
+    else
+      node->else_stmt = NULL;
+
+    *rest = tok;
+    return node;
+  }
+  if (equal(tok, "for"))
+  {
+    Node *node = new_node(ND_FOR);
+    tok = consume(tok->next, "(");
+
+    node->init_expr = expr_stmt(&tok, tok);
+
+    if (!equal(tok, ";"))
+      node->cond_expr = expr(&tok, tok);
+    tok = consume(tok, ";");
+
+    if (!equal(tok, ")"))
+      node->inc_expr = expr(&tok, tok);
+    tok = consume(tok, ")");
+
+    node->then_stmt = stmt(rest, tok);
+    return node;
+  }
+  if (equal(tok, "while"))
+  {
+    Node *node = new_node(ND_FOR);
+    tok = consume(tok->next, "(");
+    node->cond_expr = expr(&tok, tok);
+    tok = consume(tok, ")");
+    node->then_stmt = stmt(rest, tok);
+    return node;
+  }
+
   if (equal(tok, "{"))
   {
     return compound_stmt(rest, tok->next);
@@ -91,9 +136,9 @@ static Node *stmt(const Token **rest, const Token *tok)
   return expr_stmt(rest, tok);
 }
 
-
 // compound-stmt = stmt* "}"
-static Node *compound_stmt(const Token **rest,const Token *tok) {
+static Node *compound_stmt(const Token **rest, const Token *tok)
+{
   Node head = {0};
   Node *cur = &head;
   while (!equal(tok, "}"))
@@ -101,15 +146,21 @@ static Node *compound_stmt(const Token **rest,const Token *tok) {
     cur = cur->next = stmt(&tok, tok);
   }
 
-  Node *node = new_node(ND_BLOCK,NULL,NULL);
+  Node *node = new_node(ND_BLOCK);
   node->body = head.next;
   *rest = tok->next;
   return node;
 }
 
-// expr-stmt = expr ";"
+// expr-stmt = expr? ";"
 static Node *expr_stmt(const Token **rest, const Token *tok)
 {
+  if (equal(tok, ";"))
+  {
+    // empty expression
+    *rest = tok->next;
+    return new_node(ND_BLOCK);
+  }
   Node *node = new_unary(ND_EXPR_STMT, expr(&tok, tok));
   *rest = consume(tok, ";");
   return node;

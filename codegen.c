@@ -2,6 +2,12 @@
 
 static int depth;
 
+static int count(void)
+{
+  static int i = 1;
+  return i++;
+}
+
 static void push(void)
 {
   printf("  push %%rax\n");
@@ -110,6 +116,39 @@ static void gen_stmt(Node *node)
 {
   switch (node->kind)
   {
+  case ND_IF:
+  {
+    const int c = count();
+    gen_expr(node->cond_expr);
+    printf("  cmp $0, %%rax\n");
+    printf("  je  .L.else.%d\n", c);
+    gen_stmt(node->then_stmt);
+    printf("  jmp .L.end.%d\n", c);
+    printf(".L.else.%d:\n", c);
+    if (node->else_stmt)
+    {
+      gen_stmt(node->else_stmt);
+    }
+    printf(".L.end.%d:\n", c);
+    return;
+  }
+  case ND_FOR: {
+    int c = count();
+    if (node->init_expr)
+      gen_stmt(node->init_expr);
+    printf(".L.begin.%d:\n", c);
+    if (node->cond_expr) {
+      gen_expr(node->cond_expr);
+      printf("  cmp $0, %%rax\n");
+      printf("  je  .L.end.%d\n", c);
+    }
+    gen_stmt(node->then_stmt);
+    if (node->inc_expr)
+      gen_expr(node->inc_expr);
+    printf("  jmp .L.begin.%d\n", c);
+    printf(".L.end.%d:\n", c);
+    return;
+  }
   case ND_BLOCK:
     for (Node *n = node->body; n; n = n->next)
     {

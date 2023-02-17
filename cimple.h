@@ -78,6 +78,8 @@ typedef enum
   ND_LE,        // <=
   ND_ASSIGN,    // =
   ND_RETURN,    // "return"
+  ND_IF,        // "if"
+  ND_FOR,       // "for" or "while"
   ND_BLOCK,     // { ... }
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
@@ -91,11 +93,23 @@ struct Node
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side
 
-  // Block
-  Node *body;    // Used if kind == ND_BLOCK
+  // "if" statement
+  Node *else_stmt;
 
-  Obj *var;      // Used if kind == ND_VAR
-  int val;       // Used if kind == ND_NUM
+  // "if" statement or "for" statement
+  Node *then_stmt;
+  Node *cond_expr;
+
+  // "for" statement
+  Node *init_expr;
+  Node *inc_expr;
+
+  // Block
+  Node *body; // Used if kind == ND_BLOCK
+
+  Obj *var; // Used if kind == ND_VAR
+
+  int val; // Used if kind == ND_NUM
 };
 
 Function *parse(const Token *tok);
