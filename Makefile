@@ -1,11 +1,19 @@
 CFLAGS=-std=c99 -g -static -pedantic-errors -Wall
+INCS=-I .
+SRCS=$(wildcard *.c)
+OBJS=$(SRCS:.c=.o)
 
-
-cimple: main.o
-	$(CC) -o $@ $? $(LDFLAGS)
+all: cimple
 
 test:
 	./test.sh
+
+%.o : %.c
+	$(CC) $(CFLAGS) $(INCS) -c $< -o $@
+
+cimple: $(OBJS)
+	$(CC) $(CFLAGS) $(INCS) $(OBJS) -o $@
+
 clean:
 	rm -f cimple *.o *~ tmp*
 
