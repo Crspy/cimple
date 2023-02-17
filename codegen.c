@@ -1,69 +1,119 @@
 #include "cimple.h"
 
-static void gen(Node *node)
-{
-  if (node->kind == ND_NUM)
-  {
-    printf("\tpush %ld\n", node->val);
+static int depth;
+
+static void push(void) {
+  printf("  push %%rax\n");
+  depth++;
+}
+
+static void pop(char *arg) {
+  printf("  pop %s\n", arg);
+  depth--;
+}
+
+// Compute the absolute address of a given node.
+// It's an error if a given node does not reside in memory.
+static void gen_addr(Node *node) {
+  if (node->kind == ND_VAR) {
+    int offset = (node->name - 'a' + 1) * 8;
+    printf("  lea %d(%%rbp), %%rax\n", -offset);
     return;
   }
 
-  gen(node->lhs);
-  gen(node->rhs);
-
-  printf("\tpop rdi\n");
-  printf("\tpop rax\n");
-
-  switch (node->kind)
-  {
-  case ND_ADD:
-    printf("\tadd rax, rdi\n");
-    break;
-  case ND_SUB:
-    printf("\tsub rax, rdi\n");
-    break;
-  case ND_MUL:
-    printf("\timul rax, rdi\n");
-    break;
-  case ND_DIV:
-    printf("\tcqo\n"); // sign-extend rax into rdx to be (rdx:rax) for the idiv instruction
-    printf("\tidiv rdi\n");
-    break;
-  case ND_EQ:
-    printf("\tcmp rax, rdi\n");
-    printf("\tsete al\n");
-    printf("\tmovzb rax, al\n");
-    break;
-  case ND_NE:
-    printf("\tcmp rax, rdi\n");
-    printf("\tsetne al\n");
-    printf("\tmovzb rax, al\n");
-    break;
-  case ND_LT:
-    printf("\tcmp rax, rdi\n");
-    printf("\tsetl al\n");
-    printf("\tmovzb rax, al\n");
-    break;
-  case ND_LE:
-    printf("\tcmp rax, rdi\n");
-    printf("\tsetle al\n");
-    printf("\tmovzb rax, al\n");
-    break;
-  }
-
-  printf("\tpush rax\n");
+  error("not an lvalue");
 }
 
-void codegen(Node *node)
+static void gen_expr(Node *node) {
+  switch (node->kind) {
+  case ND_NUM:
+    printf("  mov $%d, %%rax\n", node->val);
+    return;
+  case ND_NEG:
+    gen_expr(node->lhs);
+    printf("  neg %%rax\n");
+    return;
+  case ND_VAR:
+    gen_addr(node);
+    printf("  mov (%%rax), %%rax\n");
+    return;
+  case ND_ASSIGN:
+    gen_addr(node->lhs);
+    push(); // push the address of the local variable
+    gen_expr(node->rhs);
+    pop("%rdi"); // pop the address of the local variable
+    printf("  mov %%rax, (%%rdi)\n");
+    return;
+  }
+
+  gen_expr(node->rhs);
+  push();
+  gen_expr(node->lhs);
+  pop("%rdi");
+
+  switch (node->kind) {
+  case ND_ADD:
+    printf("  add %%rdi, %%rax\n");
+    return;
+  case ND_SUB:
+    printf("  sub %%rdi, %%rax\n");
+    return;
+  case ND_MUL:
+    printf("  imul %%rdi, %%rax\n");
+    return;
+  case ND_DIV:
+    printf("  cqo\n");
+    printf("  idiv %%rdi\n");
+    return;
+  case ND_EQ:
+  case ND_NE:
+  case ND_LT:
+  case ND_LE:
+    printf("  cmp %%rdi, %%rax\n");
+
+    if (node->kind == ND_EQ)
+      printf("  sete %%al\n");
+    else if (node->kind == ND_NE)
+      printf("  setne %%al\n");
+    else if (node->kind == ND_LT)
+      printf("  setl %%al\n");
+    else if (node->kind == ND_LE)
+      printf("  setle %%al\n");
+
+    printf("  movzb %%al, %%rax\n");
+    return;
+  }
+
+  error("invalid expression");
+}
+
+static void gen_stmt(Node* node)
 {
-  printf(".intel_syntax noprefix\n");
-  printf(".global main\n");
+  if(node->kind == ND_EXPR_STMT)
+  {
+    gen_expr(node->lhs);
+    return;
+  }
+
+  error("invalid statement");
+}
+
+void codegen(Node *node) {
+  printf("  .globl main\n");
   printf("main:\n");
 
-  for (Node *n = node; n; n = n->next)
-  {
-    gen(n);
-    printf("\tpop rax\n");
+  // Prologue
+  printf("  push %%rbp\n");
+  printf("  mov %%rsp, %%rbp\n");
+  printf("  sub $208, %%rsp\n");
+  
+
+  for (Node *n = node; n; n = n->next) {
+    gen_stmt(n);
+    assert(depth == 0);
   }
-  printf("\tret\n");
+  // epilogue
+  printf("  mov %%rbp, %%rsp\n");
+  printf("  pop %%rbp\n");
+  printf("  ret\n");
 }

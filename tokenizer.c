@@ -1,10 +1,10 @@
 #include "cimple.h"
 
-char *user_input;
-Token *token;
+// Input string
+static const char *current_input;
 
 // Reports an error and exit.
-void error(char *fmt, ...) {
+void error(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
@@ -13,12 +13,9 @@ void error(char *fmt, ...) {
 }
 
 // Reports an error location and exit.
-void error_at(char *loc, char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-
-  int pos = loc - user_input;
-  fprintf(stderr, "%s\n", user_input);
+static void verror_at(const char *loc, const char *fmt, va_list ap) {
+  int pos = loc - current_input;
+  fprintf(stderr, "%s\n", current_input);
   fprintf(stderr, "%*s", pos, ""); // print pos spaces.
   fprintf(stderr, "^ ");
   vfprintf(stderr, fmt, ap);
@@ -26,55 +23,57 @@ void error_at(char *loc, char *fmt, ...) {
   exit(1);
 }
 
+void error_at(const char *loc,const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(loc, fmt, ap);
+}
+
+void error_tok(const Token *tok,const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(tok->loc, fmt, ap);
+}
+
 // Consumes the current token if it matches `op`.
-bool consume(char *op) {
-  if (token->kind != TK_RESERVED || strlen(op) != token->len ||
-      strncmp(token->str, op, token->len))
-    return false;
-  token = token->next;
-  return true;
+bool equal(const Token *tok, const char *op) {
+  return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
 }
 
 // Ensure that the current token is `op`.
-void expect(char *op) {
-  if (token->kind != TK_RESERVED || strlen(op) != token->len ||
-      strncmp(token->str, op, token->len))
-    error_at(token->str, "expected \"%s\"", op);
-  token = token->next;
+Token *consume(const Token *tok,const char *op) {
+  if (!equal(tok, op))
+    error_tok(tok, "expected '%s'", op);
+  return tok->next;
 }
 
-// Ensure that the current token is TK_NUM.
-long expect_number(void) {
-  if (token->kind != TK_NUM)
-    error_at(token->str, "expected a number");
-  long val = token->val;
-  token = token->next;
-  return val;
-}
-
-bool at_eof(void) {
-  return token->kind == TK_EOF;
-}
-
-// Create a new token and add it as the next token of `cur`.
-static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
+// Create a new token.
+static Token *new_token(TokenKind kind, const char *start,const char *end) {
   Token *tok = malloc(sizeof(Token));
   tok->kind = kind;
-  tok->str = str;
-  tok->len = len;
+  tok->loc = start;
   tok->next = NULL;
-  cur->next = tok;
+  tok->len = end - start;
   return tok;
 }
 
-static bool startswith(char *str, char *substr) {
-  return strncmp(str, substr, strlen(substr)) == 0;
+static bool startswith(const char *p,const char *q) {
+  return strncmp(p, q, strlen(q)) == 0;
 }
 
-// Tokenize `user_input` and returns new tokens.
-Token *tokenize(void) {
-  char *p = user_input;
-  Token head;
+// Read a punctuator token from p and returns its length.
+static int read_punct(const char *p) {
+  if (startswith(p, "==") || startswith(p, "!=") ||
+      startswith(p, "<=") || startswith(p, ">="))
+    return 2;
+
+  return ispunct(*p) ? 1 : 0;
+}
+
+// Tokenize `current_input` and returns new tokens.
+Token *tokenize(const char *p) {
+  current_input = p;
+  Token head = {0};
   Token *cur = &head;
 
   while (*p) {
@@ -84,32 +83,33 @@ Token *tokenize(void) {
       continue;
     }
 
-    // Multi-letter punctuators
-    if (startswith(p, "==") || startswith(p, "!=") ||
-        startswith(p, "<=") || startswith(p, ">=")) {
-      cur = new_token(TK_RESERVED, cur, p, 2);
-      p += 2;
-      continue;
-    }
-
-    // Single-letter punctuators
-    if (ispunct(*p)) {
-      cur = new_token(TK_RESERVED, cur, p++, 1);
-      continue;
-    }
-
-    // Integer literal
+    // Numeric literal
     if (isdigit(*p)) {
-      cur = new_token(TK_NUM, cur, p, 0);
-      char *q = p;
-      cur->val = strtol(p, &p, 10);
-      cur->len = p - q;
+      cur = cur->next = new_token(TK_NUM, p, p);
+      const char *num_start = p;
+      cur->val = strtoul(p,(char**) &p, 10);
+      cur->len = p - num_start;
+      continue;
+    }
+
+      // Identifier
+    if ('a' <= *p && *p <= 'z') {
+      cur = cur->next = new_token(TK_IDENT, p, p + 1);
+      p++;
+      continue;
+    }
+
+    // Punctuators
+    int punct_len = read_punct(p);
+    if (punct_len) {
+      cur = cur->next = new_token(TK_PUNCT, p, p + punct_len);
+      p += cur->len;
       continue;
     }
 
     error_at(p, "invalid token");
   }
 
-  new_token(TK_EOF, cur, p, 0);
+  cur = cur->next = new_token(TK_EOF, p, p);
   return head.next;
 }

@@ -1,4 +1,4 @@
-CFLAGS=-std=c99 -g -static -pedantic-errors -Wall
+CFLAGS=-std=c99 -g -static -pedantic-errors -Wall -Wno-switch
 INCS=-I .
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
