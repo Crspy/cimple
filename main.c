@@ -5,19 +5,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef enum {
-  TK_RESERVED, // Keywords or punctuators
-  TK_NUM,      // Integer literals
-  TK_EOF,      // End-of-file markers
+//
+// Tokenizer
+//
+typedef enum
+{
+    TK_RESERVED, // Keywords or punctuators
+    TK_NUM,      // Integer literals
+    TK_EOF,      // End-of-file markers
 } TokenKind;
 
 // Token type
 typedef struct Token Token;
-struct Token {
-  TokenKind kind; // Token kind
-  Token *next;    // Next token
-  long val;       // If kind is TK_NUM, its value
-  char *str;      // Token string
+struct Token
+{
+    TokenKind kind; // Token kind
+    Token *next;    // Next token
+    long val;       // If kind is TK_NUM, its value
+    char *str;      // Token string
 };
 
 // Input program
@@ -27,123 +32,259 @@ char *user_input;
 Token *token;
 
 // Reports an error and exit.
-void error(char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  fprintf(stderr, "\n");
-  exit(1);
+void error(char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    exit(1);
 }
 
 // Reports an error location and exit.
-void error_at(char *loc, char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
+void error_at(char *loc, char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
 
-  int pos = loc - user_input;
-  fprintf(stderr, "%s\n", user_input);
-  fprintf(stderr, "%*s", pos, ""); // print pos spaces.
-  fprintf(stderr, "^ ");
-  vfprintf(stderr, fmt, ap);
-  fprintf(stderr, "\n");
-  exit(1);
+    int pos = loc - user_input;
+    fprintf(stderr, "%s\n", user_input);
+    fprintf(stderr, "%*s", pos, ""); // print pos spaces.
+    fprintf(stderr, "^ ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    exit(1);
 }
 
 // Consumes the current token if it matches `op`.
-bool consume(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
-    return false;
-  token = token->next;
-  return true;
+bool consume(char op)
+{
+    if (token->kind != TK_RESERVED || token->str[0] != op)
+        return false;
+    token = token->next;
+    return true;
 }
 
 // Ensure that the current token is `op`.
-void expect(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
-    error_at(token->str, "expected '%c'", op);
-  token = token->next;
+void expect(char op)
+{
+    if (token->kind != TK_RESERVED || token->str[0] != op)
+        error_at(token->str, "expected '%c'", op);
+    token = token->next;
 }
 
 // Ensure that the current token is TK_NUM.
-long expect_number(void) {
-  if (token->kind != TK_NUM)
-    error_at(token->str, "expected a number");
-  long val = token->val;
-  token = token->next;
-  return val;
+long expect_number(void)
+{
+    if (token->kind != TK_NUM)
+        error_at(token->str, "expected a number");
+    long val = token->val;
+    token = token->next;
+    return val;
 }
 
-bool at_eof(void) {
-  return token->kind == TK_EOF;
+bool at_eof(void)
+{
+    return token->kind == TK_EOF;
 }
 
 // Create a new token and add it as the next token of `cur`.
-Token *new_token(TokenKind kind, Token *cur, char *str) {
-  Token *tok = (Token*)malloc(sizeof(Token));
-  tok->kind = kind;
-  tok->str = str;
-  cur->next = tok;
-  return tok;
+Token *new_token(TokenKind kind, Token *cur, char *str)
+{
+    Token *tok = (Token *)malloc(sizeof(Token));
+    tok->kind = kind;
+    tok->str = str;
+    cur->next = tok;
+    return tok;
 }
 
 // Tokenize `user_input` and returns new tokens.
-Token *tokenize(void) {
-  char *p = user_input;
-  Token head;
-  Token *cur = &head;
+Token *tokenize(void)
+{
+    char *p = user_input;
+    Token head;
+    Token *cur = &head;
 
-  while (*p) {
-    // Skip whitespace characters.
-    if (isspace(*p)) {
-      p++;
-      continue;
+    while (*p)
+    {
+        // Skip whitespace characters.
+        if (isspace(*p))
+        {
+            p++;
+            continue;
+        }
+
+        // Punctuators
+        if (ispunct(*p))
+        {
+            cur = new_token(TK_RESERVED, cur, p++);
+            continue;
+        }
+
+        // Integer literal
+        if (isdigit(*p))
+        {
+            cur = new_token(TK_NUM, cur, p);
+            cur->val = strtol(p, &p, 0); // we pass 0 to support decimal/hexadecimal/octal numbers
+            continue;
+        }
+
+        error_at(p, "invalid token");
     }
 
-    // Punctuator
-    if (*p == '+' || *p == '-') {
-      cur = new_token(TK_RESERVED, cur, p++);
-      continue;
-    }
-
-    // Integer literal
-    if (isdigit(*p)) {
-      cur = new_token(TK_NUM, cur, p);
-      cur->val = strtol(p, &p, 0); // we pass 0 to support decimal/hexadecimal/octal numbers
-      continue;
-    }
-
-    error_at(p, "expected a number");
-  }
-
-  new_token(TK_EOF, cur, p);
-  return head.next;
+    new_token(TK_EOF, cur, p);
+    return head.next;
 }
 
-int main(int argc, char **argv) {
-  if (argc != 2)
-    error("%s: invalid number of arguments", argv[0]);
+//
+// Parser
+//
+typedef enum
+{
+    ND_ADD, // +
+    ND_SUB, // -
+    ND_MUL, // *
+    ND_DIV, // /
+    ND_NUM, // Integer
+} NodeKind;
 
-  user_input = argv[1];
-  token = tokenize();
+// AST node type
+typedef struct Node
+{
+    NodeKind kind;    // Node kind
+    long val;         // Used if kind == ND_NUM
+    struct Node *lhs; // Left-hand side
+    struct Node *rhs; // Right-hand side
+} Node;
 
-  printf(".intel_syntax noprefix\n");
-  printf(".global main\n");
-  printf("main:\n");
+static Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
+{
+    Node *node = malloc(sizeof(Node));
+    node->kind = kind;
+    node->lhs = lhs;
+    node->rhs = rhs;
+    return node;
+}
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs)
+{
+    Node *node = new_node(kind, lhs, rhs);
+    return node;
+}
 
-  // The first token must be a number
-  printf("  mov rax, %ld\n", expect_number());
+static Node *new_num(int val)
+{
+    Node *node = new_node(ND_NUM, NULL, NULL);
+    node->val = val;
+    return node;
+}
+static Node *expr(void);
+static Node *mul(void);
+static Node *primary(void);
 
-  // ... followed by either `+ <number>` or `- <number>`.
-  while (!at_eof()) {
-    if (consume('+')) {
-      printf("  add rax, %ld\n", expect_number());
-      continue;
+// expr = mul ("+" mul | "-" mul)*
+static Node *expr(void)
+{
+    Node *node = mul();
+
+    for (;;)
+    {
+        if (consume('+'))
+            node = new_binary(ND_ADD, node, mul());
+        else if (consume('-'))
+            node = new_binary(ND_SUB, node, mul());
+        else
+            return node;
+    }
+}
+
+// mul = primary ("*" primary | "/" primary)*
+static Node *mul(void)
+{
+    Node *node = primary();
+
+    for (;;)
+    {
+        if (consume('*'))
+            node = new_binary(ND_MUL, node, primary());
+        else if (consume('/'))
+            node = new_binary(ND_DIV, node, primary());
+        else
+            return node;
+    }
+}
+
+// primary = "(" expr ")" | num
+static Node *primary(void)
+{
+    if (consume('('))
+    {
+        Node *node = expr();
+        expect(')');
+        return node;
     }
 
-    expect('-');
-    printf("  sub rax, %ld\n", expect_number());
-  }
+    return new_num(expect_number());
+}
 
-  printf("  ret\n");
-  return 0;
+//
+// Code generator
+//
+
+static void gen(Node *node)
+{
+    if (node->kind == ND_NUM)
+    {
+        printf("  push %ld\n", node->val);
+        return;
+    }
+
+    gen(node->lhs);
+    gen(node->rhs);
+
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+
+    switch (node->kind)
+    {
+    case ND_ADD:
+        printf("  add rax, rdi\n");
+        break;
+    case ND_SUB:
+        printf("  sub rax, rdi\n");
+        break;
+    case ND_MUL:
+        printf("  imul rax, rdi\n");
+        break;
+    case ND_DIV:
+        printf("  cqo\n"); // sign-extend rax into rdx to be (rdx:rax) for the idiv instruction
+        printf("  idiv rdi\n");
+        break;
+    }
+
+    printf("  push rax\n");
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 2)
+        error("%s: invalid number of arguments", argv[0]);
+
+    // Tokenize and parse.
+    user_input = argv[1];
+    token = tokenize();
+    Node *node = expr();
+
+    // print assembly directives and main declaration
+    printf(".intel_syntax noprefix\n");
+    printf(".global main\n");
+    printf("main:\n");
+
+    // traverse the ast to emit assembly
+    gen(node);
+
+    // The result must be at the top of the stack, so pop it
+    // to RAX to make it a program exit code.
+    printf("  pop rax\n");
+    printf("  ret\n");
+    return 0;
 }
