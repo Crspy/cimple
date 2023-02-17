@@ -23,6 +23,7 @@ struct Token
     Token *next;    // Next token
     long val;       // If kind is TK_NUM, its value
     char *str;      // Token string
+    size_t len;     // Token length
 };
 
 // Input program
@@ -57,19 +58,23 @@ void error_at(char *loc, char *fmt, ...)
 }
 
 // Consumes the current token if it matches `op`.
-bool consume(char op)
+bool consume(char *op)
 {
-    if (token->kind != TK_RESERVED || token->str[0] != op)
+    if (token->kind != TK_RESERVED || strlen(op) != token->len || strncmp(token->str, op, token->len) != 0)
+    {
         return false;
+    }
     token = token->next;
     return true;
 }
 
 // Ensure that the current token is `op`.
-void expect(char op)
+void expect(char *op)
 {
-    if (token->kind != TK_RESERVED || token->str[0] != op)
-        error_at(token->str, "expected '%c'", op);
+    if (token->kind != TK_RESERVED || strlen(op) != token->len || strncmp(token->str, op, token->len) != 0)
+    {
+        error_at(token->str, "expected \"%s\"", op);
+    }
     token = token->next;
 }
 
@@ -89,13 +94,19 @@ bool at_eof(void)
 }
 
 // Create a new token and add it as the next token of `cur`.
-Token *new_token(TokenKind kind, Token *cur, char *str)
+Token *new_token(TokenKind kind, Token *cur, char *str, size_t len)
 {
     Token *tok = (Token *)malloc(sizeof(Token));
     tok->kind = kind;
     tok->str = str;
+    tok->len = len;
     cur->next = tok;
     return tok;
+}
+
+static bool startswith(char *str, char *substr)
+{
+    return strncmp(str, substr, strlen(substr)) == 0;
 }
 
 // Tokenize `user_input` and returns new tokens.
@@ -114,25 +125,36 @@ Token *tokenize(void)
             continue;
         }
 
-        // Punctuators
+        // Multi-letter punctuators
+        if (startswith(p, "==") || startswith(p, "!=") ||
+            startswith(p, "<=") || startswith(p, ">="))
+        {
+            cur = new_token(TK_RESERVED, cur, p, 2);
+            p += 2;
+            continue;
+        }
+
+        // Single-letter Punctuators
         if (ispunct(*p))
         {
-            cur = new_token(TK_RESERVED, cur, p++);
+            cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
         }
 
         // Integer literal
         if (isdigit(*p))
         {
-            cur = new_token(TK_NUM, cur, p);
+            cur = new_token(TK_NUM, cur, p, 0);
+            char *num_str_start = p;
             cur->val = strtol(p, &p, 0); // we pass 0 to support decimal/hexadecimal/octal numbers
+            cur->len = p - num_str_start;
             continue;
         }
 
         error_at(p, "invalid token");
     }
 
-    new_token(TK_EOF, cur, p);
+    new_token(TK_EOF, cur, p, 0);
     return head.next;
 }
 
@@ -145,6 +167,10 @@ typedef enum
     ND_SUB, // -
     ND_MUL, // *
     ND_DIV, // /
+    ND_EQ,  // ==
+    ND_NE,  // !=
+    ND_LT,  // <
+    ND_LE,  // <=
     ND_NUM, // Integer
 } NodeKind;
 
@@ -178,60 +204,105 @@ static Node *new_num(int val)
     return node;
 }
 static Node *expr(void);
-static Node *mul(void);
+static Node *equality(void);
+static Node *comparison(void);
+static Node *term(void);
+static Node *factor(void);
 static Node *unary(void);
 static Node *primary(void);
 
-// expr = mul ("+" mul | "-" mul)*
+// expr = equality
 static Node *expr(void)
 {
-    Node *node = mul();
+    return equality();
+}
+
+// equality = comparison ("==" comparison | "!=" comparison)*
+static Node *equality(void)
+{
+    Node *node = comparison();
 
     for (;;)
     {
-        if (consume('+'))
-            node = new_binary(ND_ADD, node, mul());
-        else if (consume('-'))
-            node = new_binary(ND_SUB, node, mul());
+        if (consume("=="))
+            node = new_binary(ND_EQ, node, comparison());
+        else if (consume("!="))
+            node = new_binary(ND_NE, node, comparison());
         else
             return node;
     }
 }
 
-// mul = unary ("*" unary | "/" unary)*
-static Node *mul(void)
+// comparison = term ("<" term | "<=" term | ">" term | ">=" term)*
+static Node *comparison(void)
+{
+    Node *node = term();
+
+    for (;;)
+    {
+        if (consume("<"))
+            node = new_binary(ND_LT, node, term());
+        else if (consume("<="))
+            node = new_binary(ND_LE, node, term());
+        else if (consume(">"))
+            node = new_binary(ND_LT, term(), node); // we swap the operands because (a > b) is just the same as (b < a)
+        else if (consume(">="))
+            node = new_binary(ND_LE, term(), node); // we swap the operands because (a >= b) is just the same as (b <= a)
+        else
+            return node;
+    }
+}
+
+// term = factor ("+" factor | "-" factor)*
+static Node *term(void)
+{
+    Node *node = factor();
+
+    for (;;)
+    {
+        if (consume("+"))
+            node = new_binary(ND_ADD, node, factor());
+        else if (consume("-"))
+            node = new_binary(ND_SUB, node, factor());
+        else
+            return node;
+    }
+}
+
+// factor = unary ("*" unary | "/" unary)*
+static Node *factor(void)
 {
     Node *node = unary();
 
     for (;;)
     {
-        if (consume('*'))
+        if (consume("*"))
             node = new_binary(ND_MUL, node, unary());
-        else if (consume('/'))
+        else if (consume("/"))
             node = new_binary(ND_DIV, node, unary());
         else
             return node;
     }
 }
 
-
 // unary = ("+" | "-")? unary
 //       | primary
-static Node *unary(void) {
-  if (consume('+'))
-    return unary();
-  if (consume('-'))
-    return new_binary(ND_SUB, new_num(0), unary());
-  return primary();
+static Node *unary(void)
+{
+    if (consume("+"))
+        return unary();
+    if (consume("-"))
+        return new_binary(ND_SUB, new_num(0), unary());
+    return primary();
 }
 
 // primary = "(" expr ")" | num
 static Node *primary(void)
 {
-    if (consume('('))
+    if (consume("("))
     {
         Node *node = expr();
-        expect(')');
+        expect(")");
         return node;
     }
 
@@ -270,6 +341,26 @@ static void gen(Node *node)
     case ND_DIV:
         printf("  cqo\n"); // sign-extend rax into rdx to be (rdx:rax) for the idiv instruction
         printf("  idiv rdi\n");
+        break;
+    case ND_EQ:
+        printf("  cmp rax, rdi\n");
+        printf("  sete al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case ND_NE:
+        printf("  cmp rax, rdi\n");
+        printf("  setne al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case ND_LT:
+        printf("  cmp rax, rdi\n");
+        printf("  setl al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case ND_LE:
+        printf("  cmp rax, rdi\n");
+        printf("  setle al\n");
+        printf("  movzb rax, al\n");
         break;
     }
 
