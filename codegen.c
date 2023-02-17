@@ -1,65 +1,69 @@
 #include "cimple.h"
 
-static void gen(Node *node) {
-  if (node->kind == ND_NUM) {
-    printf("  push %ld\n", node->val);
+static void gen(Node *node)
+{
+  if (node->kind == ND_NUM)
+  {
+    printf("\tpush %ld\n", node->val);
     return;
   }
 
   gen(node->lhs);
   gen(node->rhs);
 
-  printf("  pop rdi\n");
-  printf("  pop rax\n");
+  printf("\tpop rdi\n");
+  printf("\tpop rax\n");
 
-  switch (node->kind) {
+  switch (node->kind)
+  {
   case ND_ADD:
-    printf("  add rax, rdi\n");
+    printf("\tadd rax, rdi\n");
     break;
   case ND_SUB:
-    printf("  sub rax, rdi\n");
+    printf("\tsub rax, rdi\n");
     break;
   case ND_MUL:
-    printf("  imul rax, rdi\n");
+    printf("\timul rax, rdi\n");
     break;
   case ND_DIV:
-    printf("  cqo\n"); // sign-extend rax into rdx to be (rdx:rax) for the idiv instruction
-    printf("  idiv rdi\n");
+    printf("\tcqo\n"); // sign-extend rax into rdx to be (rdx:rax) for the idiv instruction
+    printf("\tidiv rdi\n");
     break;
   case ND_EQ:
-    printf("  cmp rax, rdi\n");
-    printf("  sete al\n");
-    printf("  movzb rax, al\n");
+    printf("\tcmp rax, rdi\n");
+    printf("\tsete al\n");
+    printf("\tmovzb rax, al\n");
     break;
   case ND_NE:
-    printf("  cmp rax, rdi\n");
-    printf("  setne al\n");
-    printf("  movzb rax, al\n");
+    printf("\tcmp rax, rdi\n");
+    printf("\tsetne al\n");
+    printf("\tmovzb rax, al\n");
     break;
   case ND_LT:
-    printf("  cmp rax, rdi\n");
-    printf("  setl al\n");
-    printf("  movzb rax, al\n");
+    printf("\tcmp rax, rdi\n");
+    printf("\tsetl al\n");
+    printf("\tmovzb rax, al\n");
     break;
   case ND_LE:
-    printf("  cmp rax, rdi\n");
-    printf("  setle al\n");
-    printf("  movzb rax, al\n");
+    printf("\tcmp rax, rdi\n");
+    printf("\tsetle al\n");
+    printf("\tmovzb rax, al\n");
     break;
   }
 
-  printf("  push rax\n");
+  printf("\tpush rax\n");
 }
 
-void codegen(Node *node) {
+void codegen(Node *node)
+{
   printf(".intel_syntax noprefix\n");
   printf(".global main\n");
   printf("main:\n");
 
-  gen(node);
-
-  // A result must be at the top of the stack, so pop it
-  // to RAX to make it a program exit code.
-  printf("  pop rax\n");
-  printf("  ret\n");
+  for (Node *n = node; n; n = n->next)
+  {
+    gen(n);
+    printf("\tpop rax\n");
+  }
+  printf("\tret\n");
 }

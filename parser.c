@@ -3,6 +3,7 @@ static Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 {
     Node *node = malloc(sizeof(Node));
     node->kind = kind;
+    node->next = NULL;
     node->lhs = lhs;
     node->rhs = rhs;
     return node;
@@ -19,7 +20,8 @@ static Node *new_num(int val)
     node->val = val;
     return node;
 }
-Node *expr(void);
+static Node *stmt(void);
+static Node *expr(void);
 static Node *equality(void);
 static Node *comparison(void);
 static Node *term(void);
@@ -27,8 +29,30 @@ static Node *factor(void);
 static Node *unary(void);
 static Node *primary(void);
 
+
+// program = stmt*
+Node *program(void) {
+  Node head;
+  Node *cur = &head;
+
+  while (!at_eof()) {
+    cur->next = stmt();
+    cur = cur->next;
+  }
+  return head.next;
+}
+
+// stmt = expr ";"
+static Node *stmt(void) {
+  Node *node = expr();
+  expect(";");
+  return node;
+}
+
+
+
 // expr = equality
-Node *expr(void)
+static Node *expr(void)
 {
     return equality();
 }
