@@ -63,8 +63,14 @@ static Obj *new_lvar(const char *name,int len) {
 }
 
 
-// stmt = expr-stmt
+// stmt = "return" expr ";"
+//      | expr-stmt
 static Node *stmt(const Token **rest,const Token *tok) {
+  if (equal(tok, "return")) {
+    Node *node = new_unary(ND_RETURN, expr(&tok, tok->next));
+    *rest = consume(tok, ";");
+    return node;
+  }
   return expr_stmt(rest, tok);
 }
 

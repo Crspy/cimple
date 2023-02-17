@@ -2,27 +2,37 @@
 
 static int depth;
 
-static void push(void) {
+static void push(void)
+{
   printf("  push %%rax\n");
   depth++;
 }
 
-static void pop(char *arg) {
+static void pop(char *arg)
+{
   printf("  pop %s\n", arg);
   depth--;
 }
 
-// Round up `n` to the nearest multiple of `align` (where align is a power of 2)
-// For instance, align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
-static int align_to(int n, int align) {
-    return ((n-1) & -align) + align;
+bool isPowerofTwo(int n)
+{
+  return (n != 0) && ((n & (n - 1)) == 0);
 }
 
+// Round up `n` to the nearest multiple of `align` (where align is a power of 2)
+// For instance, align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
+static int align_to(int n, int align)
+{
+  assert(isPowerofTwo(align));
+  return ((n - 1) & -align) + align;
+}
 
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
-static void gen_addr(Node *node) {
-  if (node->kind == ND_VAR) {
+static void gen_addr(Node *node)
+{
+  if (node->kind == ND_VAR)
+  {
     printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
     return;
   }
@@ -30,8 +40,10 @@ static void gen_addr(Node *node) {
   error("not an lvalue");
 }
 
-static void gen_expr(Node *node) {
-  switch (node->kind) {
+static void gen_expr(Node *node)
+{
+  switch (node->kind)
+  {
   case ND_NUM:
     printf("  mov $%d, %%rax\n", node->val);
     return;
@@ -57,7 +69,8 @@ static void gen_expr(Node *node) {
   gen_expr(node->lhs);
   pop("%rdi");
 
-  switch (node->kind) {
+  switch (node->kind)
+  {
   case ND_ADD:
     printf("  add %%rdi, %%rax\n");
     return;
@@ -93,10 +106,15 @@ static void gen_expr(Node *node) {
   error("invalid expression");
 }
 
-static void gen_stmt(Node* node)
+static void gen_stmt(Node *node)
 {
-  if(node->kind == ND_EXPR_STMT)
+  switch (node->kind)
   {
+  case ND_RETURN:
+    gen_expr(node->lhs);
+    printf("  jmp .L.return\n");
+    return;
+  case ND_EXPR_STMT:
     gen_expr(node->lhs);
     return;
   }
@@ -105,16 +123,19 @@ static void gen_stmt(Node* node)
 }
 
 // Assign offsets to local variables.
-static void assign_lvar_offsets(Function *prog) {
+static void assign_lvar_offsets(Function *prog)
+{
   int offset = 0;
-  for (Obj *var = prog->locals; var; var = var->next) {
+  for (Obj *var = prog->locals; var; var = var->next)
+  {
     offset += 8;
     var->offset = -offset;
   }
   prog->stack_size = align_to(offset, 16);
 }
 
-void codegen(Function *prog) {
+void codegen(Function *prog)
+{
   assign_lvar_offsets(prog);
 
   printf("  .globl main\n");
@@ -123,14 +144,15 @@ void codegen(Function *prog) {
   // Prologue
   printf("  push %%rbp\n");
   printf("  mov %%rsp, %%rbp\n");
-  printf("  sub $%d, %%rsp\n",prog->stack_size);
-  
+  printf("  sub $%d, %%rsp\n", prog->stack_size);
 
-  for (Node *n = prog->body; n; n = n->next) {
+  for (Node *n = prog->body; n; n = n->next)
+  {
     gen_stmt(n);
     assert(depth == 0);
   }
-  
+
+  printf(".L.return:\n");
   // epilogue
   printf("  mov %%rbp, %%rsp\n");
   printf("  pop %%rbp\n");
