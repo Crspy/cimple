@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "cimple.h": "c",
+        "typeinfo": "c",
+        "string_ext.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "string_view": "c",
+        "stdio.h": "c"
+    }
+}

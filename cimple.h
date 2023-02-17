@@ -1,3 +1,5 @@
+#ifndef CIMPLE_HEADER_GUARD
+#define CIMPLE_HEADER_GUARD
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -5,11 +7,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "string_ext.h"
+
+
+typedef struct Node Node;
 
 //
 // tokenizer.c
 //
-
 typedef enum
 {
   TK_IDENT, // Identifiers
@@ -40,6 +45,25 @@ Token *tokenize(const char *input);
 // parser.c
 //
 
+// Local variable
+typedef struct Obj Obj;
+struct Obj {
+  Obj *next;
+  const char *name; // Variable name
+  int len; // Variable name length
+  int offset; // Offset from RBP
+};
+
+// Function
+typedef struct Function Function;
+struct Function {
+  Node *body;
+  Obj *locals;
+  int stack_size;
+};
+
+
+// AST node type
 typedef enum
 {
   ND_ADD,       // +
@@ -57,22 +81,23 @@ typedef enum
   ND_NUM,       // Integer
 } NodeKind;
 
-// AST node type
-typedef struct Node Node;
 struct Node
 {
   NodeKind kind; // Node kind
   Node *next;    // Next node
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side
-  char name;     // Used if kind == ND_VAR
+  Obj *var;     // Used if kind == ND_VAR
   int val;       // Used if kind == ND_NUM
 };
 
-Node *parse(const Token *tok);
+Function *parse(const Token *tok);
 
 //
 // codegen.c
 //
 
-void codegen(Node *node);
+void codegen(Function *prog);
+
+
+#endif /* CIMPLE_HEADER_GUARD */
