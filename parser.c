@@ -5,6 +5,7 @@
 Obj *locals;
 
 static Node *compound_stmt(const Token **rest, const Token *tok);
+static Node *stmt(const Token **rest,const Token *tok);
 static Node *expr_stmt(const Token **rest, const Token *tok);
 static Node *expr(const Token **rest, const Token *tok);
 static Node *assign(const Token **rest, const Token *tok);
@@ -145,6 +146,7 @@ static Node *compound_stmt(const Token **rest, const Token *tok)
   while (!equal(tok, "}"))
   {
     cur = cur->next = stmt(&tok, tok);
+    add_type(cur);
   }
 
   Node *node = new_node(ND_BLOCK, tok);
@@ -246,6 +248,66 @@ static Node *comparison(const Token **rest, const Token *tok)
   }
 }
 
+
+// In C, `+` operator is overloaded to perform the pointer arithmetic.
+// If p is a pointer, p+n adds not n but sizeof(*p)*n to the value of p,
+// so that p+n points to the location n elements (not bytes) ahead of p.
+// In other words, we need to scale an integer value before adding to a
+// pointer value. This function takes care of the scaling.
+static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
+  add_type(lhs);
+  add_type(rhs);
+
+  // num + num
+  if (is_integer(lhs->type) && is_integer(rhs->type))
+    return new_binary(ND_ADD, lhs, rhs, tok);
+
+  if (lhs->type->base && rhs->type->base)
+    error_tok(tok, "invalid operands");
+
+  // Canonicalize `num + ptr` to `ptr + num`.
+  if (!lhs->type->base && rhs->type->base) {
+    Node *tmp = lhs;
+    lhs = rhs;
+    rhs = tmp;
+  }
+
+  // ptr + num
+  rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+  return new_binary(ND_ADD, lhs, rhs, tok);
+}
+
+// Like `+`, `-` is overloaded for the pointer type.
+static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
+  add_type(lhs);
+  add_type(rhs);
+
+  // num - num
+  if (is_integer(lhs->type) && is_integer(rhs->type))
+    return new_binary(ND_SUB, lhs, rhs, tok);
+
+  // ptr - num
+  if (lhs->type->base && is_integer(rhs->type)) {
+    rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+    add_type(rhs);
+    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+    node->type = lhs->type;
+    return node;
+  }
+
+  // ptr - ptr, which returns how many elements are between the two.
+  if (lhs->type->base && rhs->type->base) {
+    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+    node->type = type_int;
+
+    // TODO: make this a right shift (>>) by n instead
+    return new_binary(ND_DIV, node, new_num(8, tok), tok); 
+  }
+
+  error_tok(tok, "invalid operands");
+  return NULL; // unreachable
+}
+
 // term = factor ("+" factor | "-" factor)*
 static Node *term(const Token **rest, const Token *tok)
 {
@@ -257,13 +319,13 @@ static Node *term(const Token **rest, const Token *tok)
 
     if (equal(tok, "+"))
     {
-      node = new_binary(ND_ADD, node, factor(&tok, tok->next), start);
+      node = new_add(node, factor(&tok, tok->next), start);
       continue;
     }
 
     if (equal(tok, "-"))
     {
-      node = new_binary(ND_SUB, node, factor(&tok, tok->next), start);
+      node = new_sub(node, factor(&tok, tok->next), start);
       continue;
     }
 

@@ -42,7 +42,7 @@ static void gen_addr(Node *node)
   switch (node->kind)
   {
   case ND_VAR:
-    printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
+    printf("\tlea %d(%%rbp), %%rax\n", node->var->offset);
     return;
   case ND_DEREF:
     gen_expr(node->lhs);

@@ -9,6 +9,7 @@
 #include <string.h>
 #include "string_ext.h"
 
+typedef struct Type Type;
 typedef struct Node Node;
 
 //
@@ -92,6 +93,7 @@ struct Node
 {
   NodeKind kind;    // Node kind
   Node *next;       // Next node
+  Type *type;       // Type, e.g. int or pointer to int
   const Token *tok; // Representative token
 
   Node *lhs; // Left-hand side
@@ -117,6 +119,26 @@ struct Node
 };
 
 Function *parse(const Token *tok);
+
+//
+// type.c
+//
+
+typedef enum {
+  TY_INT,
+  TY_PTR,
+} TypeKind;
+
+struct Type {
+  TypeKind kind;
+  Type *base;
+};
+
+extern Type *type_int;
+
+bool is_integer(Type *ty);
+void add_type(Node *node);
+
 
 //
 // codegen.c
