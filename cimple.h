@@ -117,6 +117,7 @@ struct Node
   Node *body; // Used if kind == ND_BLOCK
 
   // Function call
+  Node *args;
   char *funcname;
   int funcnameLength;
 

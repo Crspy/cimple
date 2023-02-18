@@ -451,8 +451,30 @@ static Node *unary(const Token **rest, const Token *tok)
   return primary(rest, tok);
 }
 
-// primary = "(" expr ")" | ident args? | num
-// args = "(" ")"
+// funcall = ident "(" (assign ("," assign)*)? ")"
+static Node *funcall(const Token **rest,const Token *tok) {
+  const Token *start = tok;
+  tok = tok->next->next;
+
+  Node head = {0};
+  Node *cur = &head;
+
+  while (!equal(tok, ")")) {
+    if (cur != &head)
+      tok = consume(tok, ",");
+    cur = cur->next = assign(&tok, tok);
+  }
+
+  *rest = consume(tok, ")");
+
+  Node *node = new_node(ND_FUNCALL, start);
+  node->funcname = strndup(start->loc, start->len);
+  node->funcnameLength = start->len;
+  node->args = head.next;
+  return node;
+}
+
+// primary = "(" expr ")" | ident func-args? | num
 static Node *primary(const Token **rest, const Token *tok)
 {
   if (equal(tok, "("))
@@ -467,11 +489,7 @@ static Node *primary(const Token **rest, const Token *tok)
     // Function call
     if (equal(tok->next, "("))
     {
-      Node *node = new_node(ND_FUNCALL, tok);
-      node->funcname = strndup(tok->loc, tok->len);
-      node->funcnameLength = tok->len;
-      *rest = consume(tok->next->next, ")");
-      return node;
+      return funcall(rest, tok);
     }
 
     Obj *var = find_var(tok);
