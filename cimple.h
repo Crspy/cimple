@@ -90,6 +90,8 @@ struct Node
 {
   NodeKind kind; // Node kind
   Node *next;    // Next node
+  const Token *tok;    // Representative token
+
   Node *lhs;     // Left-hand side
   Node *rhs;     // Right-hand side
 
