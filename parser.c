@@ -202,7 +202,7 @@ static Node *stmt(const Token **rest, const Token *tok)
   return expr_stmt(rest, tok);
 }
 
-// compound-stmt = stmt* "}"
+// compound-stmt = (declaration | stmt)* "}"
 static Node *compound_stmt(const Token **rest, const Token *tok)
 {
   Node head = {0};
@@ -451,7 +451,8 @@ static Node *unary(const Token **rest, const Token *tok)
   return primary(rest, tok);
 }
 
-// primary = "(" expr ")" | identifier | num
+// primary = "(" expr ")" | ident args? | num
+// args = "(" ")"
 static Node *primary(const Token **rest, const Token *tok)
 {
   if (equal(tok, "("))
@@ -463,6 +464,16 @@ static Node *primary(const Token **rest, const Token *tok)
 
   if (tok->kind == TK_IDENT)
   {
+    // Function call
+    if (equal(tok->next, "("))
+    {
+      Node *node = new_node(ND_FUNCALL, tok);
+      node->funcname = strndup(tok->loc, tok->len);
+      node->funcnameLength = tok->len;
+      *rest = consume(tok->next->next, ")");
+      return node;
+    }
+
     Obj *var = find_var(tok);
     if (!var)
     {

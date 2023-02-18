@@ -81,6 +81,10 @@ static void gen_expr(Node *node)
     pop("%rdi"); // pop the address of the local variable
     printf("\tmov %%rax, (%%rdi)\n");
     return;
+  case ND_FUNCALL:
+    printf("\tmov $0, %%rax\n");
+    printf("\tcall %s\n", node->funcname);
+    return;
   }
 
   gen_expr(node->rhs);

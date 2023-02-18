@@ -1,3 +1,4 @@
+
 assert 0 '{ return 0; }'
 assert 42 '{ return 42; }'
 assert 21 '{ return 5+20-4; }'
@@ -73,3 +74,6 @@ assert 7 '{ int x=3; int y=5; *(&y-2+1)=7; return x; }'
 assert 5 '{ int x=3; return (&x+2)-&x+3; }'
 assert 8 '{ int x, y; x=3; y=5; return x+y; }'
 assert 8 '{ int x=3, y=5; return x+y; }'
+
+assert 3 '{ return ret3(); }'
+assert 5 '{ return ret5(); }'

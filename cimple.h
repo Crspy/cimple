@@ -40,7 +40,7 @@ void error_at(const char *loc, const char *fmt, ...);
 void error_tok(const Token *tok, const char *fmt, ...);
 bool equal(const Token *tok, const char *op);
 Token *consume(const Token *tok, const char *op);
-bool match(const Token **rest,const Token *tok, const char *str);
+bool match(const Token **rest, const Token *tok, const char *str);
 Token *tokenize(const char *input);
 
 //
@@ -52,7 +52,7 @@ typedef struct Obj Obj;
 struct Obj
 {
   Obj *next;
-  Type* type;       // Type
+  Type *type;       // Type
   const char *name; // Variable name
   int len;          // Variable name length
   int offset;       // Offset from RBP
@@ -86,6 +86,7 @@ typedef enum
   ND_IF,        // "if"
   ND_FOR,       // "for" or "while"
   ND_BLOCK,     // { ... }
+  ND_FUNCALL,   // Function call
   ND_EXPR_STMT, // Expression statement
   ND_VAR,       // Variable
   ND_NUM,       // Integer
@@ -115,6 +116,10 @@ struct Node
   // Block
   Node *body; // Used if kind == ND_BLOCK
 
+  // Function call
+  char *funcname;
+  int funcnameLength;
+
   Obj *var; // Used if kind == ND_VAR
 
   int val; // Used if kind == ND_NUM
@@ -126,14 +131,16 @@ Function *parse(const Token *tok);
 // type.c
 //
 
-typedef enum {
+typedef enum
+{
   TY_INT,
   TY_PTR,
 } TypeKind;
 
-struct Type {
+struct Type
+{
   TypeKind kind;
-  
+
   // Pointer
   Type *base;
 
@@ -146,7 +153,6 @@ extern Type *type_int;
 bool is_integer(Type *ty);
 Type *pointer_to(Type *base);
 void add_type(Node *node);
-
 
 //
 // codegen.c
