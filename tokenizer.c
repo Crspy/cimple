@@ -47,6 +47,17 @@ Token *consume(const Token *tok,const char *op) {
   return tok->next;
 }
 
+// tries to consume the current token if it is equal to `str` and returns true
+// otherwise returns false
+bool match(const Token **rest,const Token *tok,const char *str) {
+  if (equal(tok, str)) {
+    *rest = tok->next;
+    return true;
+  }
+  *rest = tok;
+  return false;
+}
+
 // Create a new token.
 static Token *new_token(TokenKind kind, const char *start,const char *end) {
   Token *tok = malloc(sizeof(Token));
@@ -81,7 +92,7 @@ static int read_punct(const char *p) {
 }
 
 static bool is_keyword(Token *tok) {
-  static char *kw[] = {"return", "if", "else","for" , "while"};
+  static char *kw[] = {"return", "if", "else","for" , "while" , "int"};
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     if (equal(tok, kw[i]))

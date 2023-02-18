@@ -40,6 +40,7 @@ void error_at(const char *loc, const char *fmt, ...);
 void error_tok(const Token *tok, const char *fmt, ...);
 bool equal(const Token *tok, const char *op);
 Token *consume(const Token *tok, const char *op);
+bool match(const Token **rest,const Token *tok, const char *str);
 Token *tokenize(const char *input);
 
 //
@@ -51,6 +52,7 @@ typedef struct Obj Obj;
 struct Obj
 {
   Obj *next;
+  Type* type;       // Type
   const char *name; // Variable name
   int len;          // Variable name length
   int offset;       // Offset from RBP
@@ -131,12 +133,18 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
+  
+  // Pointer
   Type *base;
+
+  // Declaration
+  const Token *name;
 };
 
 extern Type *type_int;
 
 bool is_integer(Type *ty);
+Type *pointer_to(Type *base);
 void add_type(Node *node);
 
 

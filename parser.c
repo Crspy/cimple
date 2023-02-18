@@ -4,8 +4,9 @@
 // accumulated to this list.
 Obj *locals;
 
+static Node *declaration(const Token **rest, const Token *tok);
 static Node *compound_stmt(const Token **rest, const Token *tok);
-static Node *stmt(const Token **rest,const Token *tok);
+static Node *stmt(const Token **rest, const Token *tok);
 static Node *expr_stmt(const Token **rest, const Token *tok);
 static Node *expr(const Token **rest, const Token *tok);
 static Node *assign(const Token **rest, const Token *tok);
@@ -62,14 +63,77 @@ static Node *new_var_node(Obj *var, const Token *tok)
   return node;
 }
 
-static Obj *new_lvar(const char *name, int len)
+static Obj *new_lvar(Type *type, const char *name, int len)
 {
   Obj *var = malloc(sizeof(Obj));
   var->name = name;
   var->len = len;
   var->next = locals;
+  var->type = type;
   locals = var;
   return var;
+}
+
+static char *get_ident(const Token *tok)
+{
+  if (tok->kind != TK_IDENT)
+    error_tok(tok, "expected an identifier");
+  return strndup(tok->loc, tok->len);
+}
+
+// declspec = "int"
+static Type *declspec(const Token **rest, const Token *tok)
+{
+  *rest = consume(tok, "int");
+  return type_int;
+}
+
+// declarator = "*"* ident
+static Type *declarator(const Token **rest, const Token *tok, Type *type)
+{
+  while (match(&tok, tok, "*"))
+  {
+    type = pointer_to(type);
+  }
+
+  if (tok->kind != TK_IDENT)
+    error_tok(tok, "expected a variable name");
+
+  type->name = tok;
+  *rest = tok->next;
+  return type;
+}
+
+// declaration = declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+static Node *declaration(const Token **rest, const Token *tok)
+{
+  Type *base_type = declspec(&tok, tok);
+
+  Node head = {0};
+  Node *cur = &head;
+  int i = 0;
+
+  while (!equal(tok, ";"))
+  {
+    if (i++ > 0)
+      tok = consume(tok, ",");
+
+    Type *type = declarator(&tok, tok, base_type);
+    Obj *var = new_lvar(type, get_ident(type->name), type->name->len);
+
+    if (!equal(tok, "="))
+      continue;
+
+    Node *lhs = new_var_node(var, type->name);
+    Node *rhs = assign(&tok, tok->next);
+    Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+    cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
+  }
+
+  Node *node = new_node(ND_BLOCK, tok);
+  node->body = head.next;
+  *rest = tok->next;
+  return node;
 }
 
 // stmt = "return" expr ";"
@@ -145,7 +209,14 @@ static Node *compound_stmt(const Token **rest, const Token *tok)
   Node *cur = &head;
   while (!equal(tok, "}"))
   {
-    cur = cur->next = stmt(&tok, tok);
+    if (equal(tok, "int"))
+    {
+      cur = cur->next = declaration(&tok, tok);
+    }
+    else
+    {
+      cur = cur->next = stmt(&tok, tok);
+    }
     add_type(cur);
   }
 
@@ -248,13 +319,13 @@ static Node *comparison(const Token **rest, const Token *tok)
   }
 }
 
-
 // In C, `+` operator is overloaded to perform the pointer arithmetic.
 // If p is a pointer, p+n adds not n but sizeof(*p)*n to the value of p,
 // so that p+n points to the location n elements (not bytes) ahead of p.
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
-static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
+static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
+{
   add_type(lhs);
   add_type(rhs);
 
@@ -266,7 +337,8 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
     error_tok(tok, "invalid operands");
 
   // Canonicalize `num + ptr` to `ptr + num`.
-  if (!lhs->type->base && rhs->type->base) {
+  if (!lhs->type->base && rhs->type->base)
+  {
     Node *tmp = lhs;
     lhs = rhs;
     rhs = tmp;
@@ -278,7 +350,8 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
-static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
+static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
+{
   add_type(lhs);
   add_type(rhs);
 
@@ -287,7 +360,8 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
     return new_binary(ND_SUB, lhs, rhs, tok);
 
   // ptr - num
-  if (lhs->type->base && is_integer(rhs->type)) {
+  if (lhs->type->base && is_integer(rhs->type))
+  {
     rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
     add_type(rhs);
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
@@ -296,12 +370,13 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
   }
 
   // ptr - ptr, which returns how many elements are between the two.
-  if (lhs->type->base && rhs->type->base) {
+  if (lhs->type->base && rhs->type->base)
+  {
     Node *node = new_binary(ND_SUB, lhs, rhs, tok);
     node->type = type_int;
 
     // TODO: make this a right shift (>>) by n instead
-    return new_binary(ND_DIV, node, new_num(8, tok), tok); 
+    return new_binary(ND_DIV, node, new_num(8, tok), tok);
   }
 
   error_tok(tok, "invalid operands");
@@ -390,7 +465,9 @@ static Node *primary(const Token **rest, const Token *tok)
   {
     Obj *var = find_var(tok);
     if (!var)
-      var = new_lvar(strndup(tok->loc, tok->len), tok->len);
+    {
+      error_tok(tok, "undefined variable");
+    }
     *rest = tok->next;
     return new_var_node(var, tok);
   }

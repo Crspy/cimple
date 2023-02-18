@@ -10,6 +10,7 @@ Type *pointer_to(Type *base) {
   Type *ty = malloc(sizeof(Type));
   ty->kind = TY_PTR;
   ty->base = base;
+  ty->name = NULL;
   return ty;
 }
 
@@ -35,24 +36,29 @@ void add_type(Node *node) {
   case ND_DIV:
   case ND_NEG:
   case ND_ASSIGN:
+    // TODO: add warnings about incompatible (pointer?) types
     node->type = node->lhs->type;
     return;
   case ND_EQ:
   case ND_NE:
   case ND_LT:
   case ND_LE:
-  case ND_VAR:
+
   case ND_NUM:
     node->type = type_int;
     return;
+  case ND_VAR:
+    node->type = node->var->type;
+    break;
   case ND_ADDR:
     node->type = pointer_to(node->lhs->type);
     return;
   case ND_DEREF:
-    if (node->lhs->type->kind == TY_PTR)
-      node->type = node->lhs->type->base;
-    else
-      node->type = type_int;
+    if (node->lhs->type->kind != TY_PTR)
+    {
+      error_tok(node->tok, "invalid pointer dereference");
+    }
+    node->type = node->lhs->type->base;
     return;
   }
 }
