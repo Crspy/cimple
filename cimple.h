@@ -47,29 +47,29 @@ Token *tokenize(const char *input);
 // parser.c
 //
 
-// Local variable
+// Variable or function
 typedef struct Obj Obj;
 struct Obj
 {
   Obj *next;
-  Type *type;       // Type
   const char *name; // Variable name
-  int len;          // Variable name length
-  int offset;       // Offset from RBP
-};
+  int name_length;  // Variable name length
+  Type *type;       // Type
+  bool is_local;    // local or global/function
 
-// Function
-typedef struct Function Function;
-struct Function
-{
-  Function *next;
+  // Offset from RBP (local variable)
+  int offset;
+
+  // Global variable or function
+  bool is_function;
+
+  // Function
   Obj *params;
-  const char *name;
-  int name_length;
   Node *body;
   Obj *locals;
   int stack_size;
 };
+
 
 // AST node type
 typedef enum
@@ -130,7 +130,7 @@ struct Node
   int val; // Used if kind == NODE_NUM
 };
 
-Function *parse(const Token *tok);
+Obj *parse(const Token *tok);
 
 //
 // type.c
@@ -171,9 +171,8 @@ struct Type
   Type *next;
 };
 
-
 bool is_integer(Type *type);
-Type * int_type();
+Type *int_type();
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
@@ -184,6 +183,6 @@ void add_type(Node *node);
 // codegen.c
 //
 
-void codegen(Function *prog);
+void codegen(Obj *prog);
 
 #endif /* CIMPLE_HEADER_GUARD */

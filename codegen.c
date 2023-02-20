@@ -2,7 +2,7 @@
 
 static int depth;
 static char *argreg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
-static Function *current_fn;
+static Obj *current_fn;
 
 static void gen_expr(Node *node);
 
@@ -55,8 +55,10 @@ static void gen_addr(Node *node)
 }
 
 // Load a value from where %rax is pointing to.
-static void load(Type *ty) {
-  if (ty->kind == TYPE_ARRAY) {
+static void load(Type *ty)
+{
+  if (ty->kind == TYPE_ARRAY)
+  {
     // If it is an array, do not attempt to load a value to the
     // register because in general we can't load an entire array to a
     // register. As a result, the result of an evaluation of an array
@@ -70,11 +72,11 @@ static void load(Type *ty) {
 }
 
 // Store %rax to an address that the stack top is pointing to.
-static void store(void) {
+static void store(void)
+{
   pop("%rdi");
   printf("\tmov %%rax, (%%rdi)\n");
 }
-
 
 static void gen_expr(Node *node)
 {
@@ -223,10 +225,13 @@ static void gen_stmt(Node *node)
 }
 
 // Assign offsets to local variables.
-static void assign_lvar_offsets(Function *prog)
+static void assign_lvar_offsets(Obj *prog)
 {
-  for (Function *fn = prog; fn; fn = fn->next)
+  for (Obj *fn = prog; fn; fn = fn->next)
   {
+    if (!fn->is_function)
+      continue;
+
     int offset = 0;
     for (Obj *var = fn->locals; var; var = var->next)
     {
@@ -237,13 +242,17 @@ static void assign_lvar_offsets(Function *prog)
   }
 }
 
-void codegen(Function *prog)
+void codegen(Obj *prog)
 {
   assign_lvar_offsets(prog);
 
-  for (Function *fn = prog; fn; fn = fn->next)
+  for (Obj *fn = prog; fn; fn = fn->next)
   {
+    if (!fn->is_function)
+      continue;
+
     printf(".globl %s\n", fn->name);
+    printf(".text\n");
     printf("%s:\n", fn->name);
     current_fn = fn;
 

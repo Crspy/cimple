@@ -2,7 +2,8 @@
 
 // All local variable instances created during parsing are
 // accumulated to this list.
-Obj *locals;
+static Obj *locals;
+static Obj *globals;
 
 static Type *declspec(const Token **rest, const Token *tok);
 static Type *declarator(const Token **rest, const Token *tok, Type *type);
@@ -24,7 +25,7 @@ static Node *primary(const Token **rest, const Token *tok);
 static Obj *find_var(const Token *tok)
 {
   for (Obj *var = locals; var; var = var->next)
-    if (var->len == tok->len && !strncmp(tok->loc, var->name, tok->len))
+    if (var->name_length == tok->len && !strncmp(tok->loc, var->name, tok->len))
       return var;
   return NULL;
 }
@@ -66,14 +67,26 @@ static Node *new_var_node(Obj *var, const Token *tok)
   return node;
 }
 
-static Obj *new_lvar(Type *type, const char *name, int len)
+static Obj *new_var(Type *type, const char *name, int len)
 {
-  Obj *var = malloc(sizeof(Obj));
+  Obj *var = calloc(1,sizeof(Obj));
   var->name = name;
-  var->len = len;
-  var->next = locals;
+  var->name_length = len;
   var->type = type;
+  return var;
+}
+
+static Obj *new_lvar(Type *type,const char *name,int name_len) {
+  Obj *var = new_var(type,name,name_len);
+  var->is_local = true;
+  var->next = locals;
   locals = var;
+  return var;
+}
+static Obj *new_gvar(Type *type,const char *name,int name_len) {
+  Obj *var = new_var(type,name,name_len);
+  var->next = globals;
+  globals = var;
   return var;
 }
 
@@ -606,35 +619,30 @@ static void create_param_lvars(Type *param)
   }
 }
 
-static Function *function(const Token **rest, const Token *tok)
+static const Token *function(const Token *tok, Type *base_type)
 {
-  Type *type = declspec(&tok, tok);
-  type = declarator(&tok, tok, type);
+  Type *type = declarator(&tok, tok, base_type);
+
+  Obj *fn = new_gvar(type,get_ident(type->name),type->name->len);
+  fn->is_function = true;
 
   locals = NULL;
-
-  Function *fn = malloc(sizeof(Function));
-  fn->next = NULL;
-  fn->name = get_ident(type->name);
-  fn->name_length = type->name->len;
   create_param_lvars(type->params);
   fn->params = locals;
 
   tok = consume(tok, "{");
-  fn->body = compound_stmt(rest, tok);
+  fn->body = compound_stmt(&tok, tok);
   fn->locals = locals;
-  fn->stack_size = 0;
-  return fn;
+  return tok;
 }
 
-// program = stmt*
-Function *parse(const Token *tok)
-{
-  Function head = {0};
-  Function *cur = &head;
-  while (tok->kind != TOKEN_EOF)
-  {
-    cur = cur->next = function(&tok, tok);
+// program = (function-definition | global-variable)*
+Obj *parse(const Token *tok) {
+  globals = NULL;
+
+  while (tok->kind != TOKEN_EOF) {
+    Type *base_type = declspec(&tok, tok);
+    tok = function(tok, base_type);
   }
-  return head.next;
+  return globals;
 }
