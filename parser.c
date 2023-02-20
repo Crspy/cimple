@@ -21,12 +21,17 @@ static Node *postfix(const Token **rest, const Token *tok);
 static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 
-// Find a local variable by name.
+// Find a variable by name.
 static Obj *find_var(const Token *tok)
 {
   for (Obj *var = locals; var; var = var->next)
     if (var->name_length == tok->len && !strncmp(tok->loc, var->name, tok->len))
       return var;
+
+  for (Obj *var = globals; var; var = var->next)
+    if (strlen(var->name) == tok->len && !strncmp(tok->loc, var->name, tok->len))
+      return var;
+
   return NULL;
 }
 
@@ -69,22 +74,24 @@ static Node *new_var_node(Obj *var, const Token *tok)
 
 static Obj *new_var(Type *type, const char *name, int len)
 {
-  Obj *var = calloc(1,sizeof(Obj));
+  Obj *var = calloc(1, sizeof(Obj));
   var->name = name;
   var->name_length = len;
   var->type = type;
   return var;
 }
 
-static Obj *new_lvar(Type *type,const char *name,int name_len) {
-  Obj *var = new_var(type,name,name_len);
+static Obj *new_lvar(Type *type, const char *name, int name_len)
+{
+  Obj *var = new_var(type, name, name_len);
   var->is_local = true;
   var->next = locals;
   locals = var;
   return var;
 }
-static Obj *new_gvar(Type *type,const char *name,int name_len) {
-  Obj *var = new_var(type,name,name_len);
+static Obj *new_gvar(Type *type, const char *name, int name_len)
+{
+  Obj *var = new_var(type, name, name_len);
   var->next = globals;
   globals = var;
   return var;
@@ -623,7 +630,7 @@ static const Token *function(const Token *tok, Type *base_type)
 {
   Type *type = declarator(&tok, tok, base_type);
 
-  Obj *fn = new_gvar(type,get_ident(type->name),type->name->len);
+  Obj *fn = new_gvar(type, get_ident(type->name), type->name->len);
   fn->is_function = true;
 
   locals = NULL;
@@ -636,13 +643,57 @@ static const Token *function(const Token *tok, Type *base_type)
   return tok;
 }
 
+static const Token *global_variable(const Token *tok, Type *base_type)
+{
+  bool first = true;
+
+  while (!match(&tok, tok, ";"))
+  {
+    if (!first)
+    {
+      tok = consume(tok, ",");
+    }
+
+    first = false;
+
+    Type *type = declarator(&tok, tok, base_type);
+    new_gvar(type, get_ident(type->name), type->name->len);
+  }
+  return tok;
+}
+
+// Lookahead tokens and returns true if a given token 
+// is a start of a function definition or declaration
+static bool is_function(const Token* tok)
+{
+  if(equal(tok, ";"))
+  {
+    return false;
+  }
+
+  Type dummy = {0};
+  Type* type = declarator(&tok,tok,&dummy);
+  return type->kind == TYPE_FUNC;
+}
+
 // program = (function-definition | global-variable)*
-Obj *parse(const Token *tok) {
+Obj *parse(const Token *tok)
+{
   globals = NULL;
 
-  while (tok->kind != TOKEN_EOF) {
+  while (tok->kind != TOKEN_EOF)
+  {
     Type *base_type = declspec(&tok, tok);
-    tok = function(tok, base_type);
+
+    // Function
+    if(is_function(tok))
+    {
+      tok = function(tok,base_type);
+      continue;
+    }
+    
+    // Global variable
+    tok = global_variable(tok, base_type);
   }
   return globals;
 }
