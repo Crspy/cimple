@@ -17,11 +17,11 @@ typedef struct Node Node;
 //
 typedef enum
 {
-  TK_IDENT,   // Identifiers
-  TK_PUNCT,   // Punctuators
-  TK_KEYWORD, // Keywords
-  TK_NUM,     // Numeric literals
-  TK_EOF,     // End-of-file markers
+  TOKEN_IDENT,   // Identifiers
+  TOKEN_PUNCT,   // Punctuators
+  TOKEN_KEYWORD, // Keywords
+  TOKEN_NUM,     // Numeric literals
+  TOKEN_EOF,     // End-of-file markers
 } TokenKind;
 
 // Token type
@@ -30,7 +30,7 @@ struct Token
 {
   TokenKind kind;  // Token kind
   Token *next;     // Next token
-  int val;         // If kind is TK_NUM, its value
+  int val;         // If kind is TOKEN_NUM, its value
   const char *loc; // Token location
   int len;         // Token length
 };
@@ -63,7 +63,8 @@ typedef struct Function Function;
 struct Function
 {
   Function *next;
-  char *name;
+  Obj *params;
+  const char *name;
   int name_length;
   Node *body;
   Obj *locals;
@@ -73,26 +74,26 @@ struct Function
 // AST node type
 typedef enum
 {
-  ND_ADD,       // +
-  ND_SUB,       // -
-  ND_MUL,       // *
-  ND_DIV,       // /
-  ND_NEG,       // unary -
-  ND_EQ,        // ==
-  ND_NE,        // !=
-  ND_LT,        // <
-  ND_LE,        // <=
-  ND_ASSIGN,    // =
-  ND_ADDR,      // unary &
-  ND_DEREF,     // unary *
-  ND_RETURN,    // "return"
-  ND_IF,        // "if"
-  ND_FOR,       // "for" or "while"
-  ND_BLOCK,     // { ... }
-  ND_FUNCALL,   // Function call
-  ND_EXPR_STMT, // Expression statement
-  ND_VAR,       // Variable
-  ND_NUM,       // Integer
+  NODE_ADD,       // +
+  NODE_SUB,       // -
+  NODE_MUL,       // *
+  NODE_DIV,       // /
+  NODE_NEG,       // unary -
+  NODE_EQ,        // ==
+  NODE_NE,        // !=
+  NODE_LT,        // <
+  NODE_LE,        // <=
+  NODE_ASSIGN,    // =
+  NODE_ADDR,      // unary &
+  NODE_DEREF,     // unary *
+  NODE_RETURN,    // "return"
+  NODE_IF,        // "if"
+  NODE_FOR,       // "for" or "while"
+  NODE_BLOCK,     // { ... }
+  NODE_FUNCALL,   // Function call
+  NODE_EXPR_STMT, // Expression statement
+  NODE_VAR,       // Variable
+  NODE_NUM,       // Integer
 } NodeKind;
 
 struct Node
@@ -117,16 +118,16 @@ struct Node
   Node *inc_expr;
 
   // Block
-  Node *body; // Used if kind == ND_BLOCK
+  Node *body; // Used if kind == NODE_BLOCK
 
   // Function call
   Node *args;
   char *funcname;
   int funcname_length;
 
-  Obj *var; // Used if kind == ND_VAR
+  Obj *var; // Used if kind == NODE_VAR
 
-  int val; // Used if kind == ND_NUM
+  int val; // Used if kind == NODE_NUM
 };
 
 Function *parse(const Token *tok);
@@ -137,9 +138,9 @@ Function *parse(const Token *tok);
 
 typedef enum
 {
-  TY_INT,
-  TY_PTR,
-  TY_FUNC
+  TYPE_INT,
+  TYPE_PTR,
+  TYPE_FUNC
 } TypeKind;
 
 struct Type
@@ -154,11 +155,14 @@ struct Type
 
   // Function type
   Type *return_type;
+  Type *params;
+  Type *next;
 };
 
 extern Type *type_int;
 
-bool is_integer(Type *ty);
+bool is_integer(Type *type);
+Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
 void add_type(Node *node);

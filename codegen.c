@@ -43,10 +43,10 @@ static void gen_addr(Node *node)
 {
   switch (node->kind)
   {
-  case ND_VAR:
+  case NODE_VAR:
     printf("\tlea %d(%%rbp), %%rax\n", node->var->offset);
     return;
-  case ND_DEREF:
+  case NODE_DEREF:
     gen_expr(node->lhs);
     return;
   }
@@ -58,32 +58,32 @@ static void gen_expr(Node *node)
 {
   switch (node->kind)
   {
-  case ND_NUM:
+  case NODE_NUM:
     printf("\tmov $%d, %%rax\n", node->val);
     return;
-  case ND_NEG:
+  case NODE_NEG:
     gen_expr(node->lhs);
     printf("\tneg %%rax\n");
     return;
-  case ND_VAR:
+  case NODE_VAR:
     gen_addr(node);
     printf("\tmov (%%rax), %%rax\n");
     return;
-  case ND_DEREF:
+  case NODE_DEREF:
     gen_expr(node->lhs);
     printf("\tmov (%%rax), %%rax\n");
     return;
-  case ND_ADDR:
+  case NODE_ADDR:
     gen_addr(node->lhs);
     return;
-  case ND_ASSIGN:
+  case NODE_ASSIGN:
     gen_addr(node->lhs);
     push(); // push the address of the local variable
     gen_expr(node->rhs);
     pop("%rdi"); // pop the address of the local variable
     printf("\tmov %%rax, (%%rdi)\n");
     return;
-  case ND_FUNCALL:
+  case NODE_FUNCALL:
   {
     int nargs = 0;
     for (Node *arg = node->args; arg; arg = arg->next)
@@ -109,32 +109,32 @@ static void gen_expr(Node *node)
 
   switch (node->kind)
   {
-  case ND_ADD:
+  case NODE_ADD:
     printf("\tadd %%rdi, %%rax\n");
     return;
-  case ND_SUB:
+  case NODE_SUB:
     printf("\tsub %%rdi, %%rax\n");
     return;
-  case ND_MUL:
+  case NODE_MUL:
     printf("\timul %%rdi, %%rax\n");
     return;
-  case ND_DIV:
+  case NODE_DIV:
     printf("\tcqo\n");
     printf("\tidiv %%rdi\n");
     return;
-  case ND_EQ:
-  case ND_NE:
-  case ND_LT:
-  case ND_LE:
+  case NODE_EQ:
+  case NODE_NE:
+  case NODE_LT:
+  case NODE_LE:
     printf("\tcmp %%rdi, %%rax\n");
 
-    if (node->kind == ND_EQ)
+    if (node->kind == NODE_EQ)
       printf("\tsete %%al\n");
-    else if (node->kind == ND_NE)
+    else if (node->kind == NODE_NE)
       printf("\tsetne %%al\n");
-    else if (node->kind == ND_LT)
+    else if (node->kind == NODE_LT)
       printf("\tsetl %%al\n");
-    else if (node->kind == ND_LE)
+    else if (node->kind == NODE_LE)
       printf("\tsetle %%al\n");
 
     printf("\tmovzb %%al, %%rax\n");
@@ -148,7 +148,7 @@ static void gen_stmt(Node *node)
 {
   switch (node->kind)
   {
-  case ND_IF:
+  case NODE_IF:
   {
     const int c = count();
     gen_expr(node->cond_expr);
@@ -164,7 +164,7 @@ static void gen_stmt(Node *node)
     printf(".L.end.%d:\n", c);
     return;
   }
-  case ND_FOR:
+  case NODE_FOR:
   {
     int c = count();
     if (node->init_expr)
@@ -183,17 +183,17 @@ static void gen_stmt(Node *node)
     printf(".L.end.%d:\n", c);
     return;
   }
-  case ND_BLOCK:
+  case NODE_BLOCK:
     for (Node *n = node->body; n; n = n->next)
     {
       gen_stmt(n);
     }
     return;
-  case ND_RETURN:
+  case NODE_RETURN:
     gen_expr(node->lhs);
     printf("\tjmp .L.return.%s\n", current_fn->name);
     return;
-  case ND_EXPR_STMT:
+  case NODE_EXPR_STMT:
     gen_expr(node->lhs);
     return;
   }
@@ -233,6 +233,13 @@ void codegen(Function *prog)
       printf("\tmov %%rsp, %%rbp\n");
 
       printf("\tsub $%d, %%rsp\n", fn->stack_size);
+    }
+
+    // Save passed-by-register arguments to the stack
+    int i = 0;
+    for (Obj *var = fn->params; var; var = var->next)
+    {
+      printf("\tmov %s, %d(%%rbp)\n", argreg[i++], var->offset);
     }
 
     // Emit code

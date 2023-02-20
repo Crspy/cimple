@@ -53,14 +53,14 @@ static Node *new_unary(NodeKind kind, Node *expr, const Token *tok)
 
 static Node *new_num(int val, const Token *tok)
 {
-  Node *node = new_node(ND_NUM, tok);
+  Node *node = new_node(NODE_NUM, tok);
   node->val = val;
   return node;
 }
 
 static Node *new_var_node(Obj *var, const Token *tok)
 {
-  Node *node = new_node(ND_VAR, tok);
+  Node *node = new_node(NODE_VAR, tok);
   node->var = var;
   return node;
 }
@@ -76,9 +76,9 @@ static Obj *new_lvar(Type *type, const char *name, int len)
   return var;
 }
 
-static char *get_ident(const Token *tok)
+static const char *get_ident(const Token *tok)
 {
-  if (tok->kind != TK_IDENT)
+  if (tok->kind != TOKEN_IDENT)
     error_tok(tok, "expected an identifier");
   return strndup(tok->loc, tok->len);
 }
@@ -90,12 +90,34 @@ static Type *declspec(const Token **rest, const Token *tok)
   return type_int;
 }
 
-// type-suffix = ("(" func-params)?
-static Type *type_suffix(const Token **rest,const Token *tok, Type *type) {
-  if (equal(tok, "(")) {
-    // TODO: parse parameters
-    *rest = consume(tok->next, ")");
-    return func_type(type);
+// type-suffix = ("(" func-params? ")")?
+// func-params = param ("," param)*
+// param       = declspec declarator
+static Type *type_suffix(const Token **rest, const Token *tok, Type *type)
+{
+  if (equal(tok, "("))
+  {
+    tok = tok->next;
+
+    Type head = {0};
+    Type *cur = &head;
+
+    while (!equal(tok, ")"))
+    {
+      if (cur != &head)
+      {
+        tok = consume(tok, ",");
+      }
+
+      Type *base_type = declspec(&tok, tok);
+      Type *type = declarator(&tok, tok, base_type);
+      cur = cur->next = copy_type(type);
+    }
+
+    type = func_type(type);
+    type->params = head.next;
+    *rest = tok->next;
+    return type;
   }
   *rest = tok;
   return type;
@@ -109,10 +131,10 @@ static Type *declarator(const Token **rest, const Token *tok, Type *type)
     type = pointer_to(type);
   }
 
-  if (tok->kind != TK_IDENT)
+  if (tok->kind != TOKEN_IDENT)
     error_tok(tok, "expected a variable name");
 
-  type = type_suffix(rest,tok->next,type);
+  type = type_suffix(rest, tok->next, type);
   type->name = tok;
   return type;
 }
@@ -139,11 +161,11 @@ static Node *declaration(const Token **rest, const Token *tok)
 
     Node *lhs = new_var_node(var, type->name);
     Node *rhs = assign(&tok, tok->next);
-    Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
-    cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
+    Node *node = new_binary(NODE_ASSIGN, lhs, rhs, tok);
+    cur = cur->next = new_unary(NODE_EXPR_STMT, node, tok);
   }
 
-  Node *node = new_node(ND_BLOCK, tok);
+  Node *node = new_node(NODE_BLOCK, tok);
   node->body = head.next;
   *rest = tok->next;
   return node;
@@ -159,14 +181,14 @@ static Node *stmt(const Token **rest, const Token *tok)
 {
   if (equal(tok, "return"))
   {
-    Node *node = new_unary(ND_RETURN, expr(&tok, tok->next), tok);
+    Node *node = new_unary(NODE_RETURN, expr(&tok, tok->next), tok);
     *rest = consume(tok, ";");
     return node;
   }
 
   if (equal(tok, "if"))
   {
-    Node *node = new_node(ND_IF, tok);
+    Node *node = new_node(NODE_IF, tok);
     tok = consume(tok->next, "(");
     node->cond_expr = expr(&tok, tok);
     tok = consume(tok, ")");
@@ -181,7 +203,7 @@ static Node *stmt(const Token **rest, const Token *tok)
   }
   if (equal(tok, "for"))
   {
-    Node *node = new_node(ND_FOR, tok);
+    Node *node = new_node(NODE_FOR, tok);
     tok = consume(tok->next, "(");
 
     node->init_expr = expr_stmt(&tok, tok);
@@ -199,7 +221,7 @@ static Node *stmt(const Token **rest, const Token *tok)
   }
   if (equal(tok, "while"))
   {
-    Node *node = new_node(ND_FOR, tok);
+    Node *node = new_node(NODE_FOR, tok);
     tok = consume(tok->next, "(");
     node->cond_expr = expr(&tok, tok);
     tok = consume(tok, ")");
@@ -233,7 +255,7 @@ static Node *compound_stmt(const Token **rest, const Token *tok)
     add_type(cur);
   }
 
-  Node *node = new_node(ND_BLOCK, tok);
+  Node *node = new_node(NODE_BLOCK, tok);
   node->body = head.next;
   *rest = tok->next;
   return node;
@@ -246,9 +268,9 @@ static Node *expr_stmt(const Token **rest, const Token *tok)
   {
     // empty expression
     *rest = tok->next;
-    return new_node(ND_BLOCK, tok);
+    return new_node(NODE_BLOCK, tok);
   }
-  Node *node = new_node(ND_EXPR_STMT, tok);
+  Node *node = new_node(NODE_EXPR_STMT, tok);
   node->lhs = expr(&tok, tok);
   *rest = consume(tok, ";");
   return node;
@@ -265,7 +287,7 @@ static Node *assign(const Token **rest, const Token *tok)
 {
   Node *node = equality(&tok, tok);
   if (equal(tok, "="))
-    return new_binary(ND_ASSIGN, node, assign(rest, tok->next), tok);
+    return new_binary(NODE_ASSIGN, node, assign(rest, tok->next), tok);
   *rest = tok;
   return node;
 }
@@ -280,13 +302,13 @@ static Node *equality(const Token **rest, const Token *tok)
     const Token *start = tok;
     if (equal(tok, "=="))
     {
-      node = new_binary(ND_EQ, node, comparison(&tok, tok->next), start);
+      node = new_binary(NODE_EQ, node, comparison(&tok, tok->next), start);
       continue;
     }
 
     if (equal(tok, "!="))
     {
-      node = new_binary(ND_NE, node, comparison(&tok, tok->next), start);
+      node = new_binary(NODE_NE, node, comparison(&tok, tok->next), start);
       continue;
     }
 
@@ -305,25 +327,25 @@ static Node *comparison(const Token **rest, const Token *tok)
     const Token *start = tok;
     if (equal(tok, "<"))
     {
-      node = new_binary(ND_LT, node, term(&tok, tok->next), start);
+      node = new_binary(NODE_LT, node, term(&tok, tok->next), start);
       continue;
     }
 
     if (equal(tok, "<="))
     {
-      node = new_binary(ND_LE, node, term(&tok, tok->next), start);
+      node = new_binary(NODE_LE, node, term(&tok, tok->next), start);
       continue;
     }
 
     if (equal(tok, ">"))
     {
-      node = new_binary(ND_LT, term(&tok, tok->next), node, start);
+      node = new_binary(NODE_LT, term(&tok, tok->next), node, start);
       continue;
     }
 
     if (equal(tok, ">="))
     {
-      node = new_binary(ND_LE, term(&tok, tok->next), node, start);
+      node = new_binary(NODE_LE, term(&tok, tok->next), node, start);
       continue;
     }
 
@@ -344,7 +366,7 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
 
   // num + num
   if (is_integer(lhs->type) && is_integer(rhs->type))
-    return new_binary(ND_ADD, lhs, rhs, tok);
+    return new_binary(NODE_ADD, lhs, rhs, tok);
 
   if (lhs->type->base && rhs->type->base)
     error_tok(tok, "invalid operands");
@@ -358,8 +380,8 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
   }
 
   // ptr + num
-  rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
-  return new_binary(ND_ADD, lhs, rhs, tok);
+  rhs = new_binary(NODE_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+  return new_binary(NODE_ADD, lhs, rhs, tok);
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
@@ -370,14 +392,14 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
 
   // num - num
   if (is_integer(lhs->type) && is_integer(rhs->type))
-    return new_binary(ND_SUB, lhs, rhs, tok);
+    return new_binary(NODE_SUB, lhs, rhs, tok);
 
   // ptr - num
   if (lhs->type->base && is_integer(rhs->type))
   {
-    rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+    rhs = new_binary(NODE_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
     add_type(rhs);
-    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+    Node *node = new_binary(NODE_SUB, lhs, rhs, tok);
     node->type = lhs->type;
     return node;
   }
@@ -385,11 +407,11 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
   // ptr - ptr, which returns how many elements are between the two.
   if (lhs->type->base && rhs->type->base)
   {
-    Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+    Node *node = new_binary(NODE_SUB, lhs, rhs, tok);
     node->type = type_int;
 
     // TODO: make this a right shift (>>) by n instead
-    return new_binary(ND_DIV, node, new_num(8, tok), tok);
+    return new_binary(NODE_DIV, node, new_num(8, tok), tok);
   }
 
   error_tok(tok, "invalid operands");
@@ -432,13 +454,13 @@ static Node *factor(const Token **rest, const Token *tok)
     const Token *start = tok;
     if (equal(tok, "*"))
     {
-      node = new_binary(ND_MUL, node, unary(&tok, tok->next), start);
+      node = new_binary(NODE_MUL, node, unary(&tok, tok->next), start);
       continue;
     }
 
     if (equal(tok, "/"))
     {
-      node = new_binary(ND_DIV, node, unary(&tok, tok->next), start);
+      node = new_binary(NODE_DIV, node, unary(&tok, tok->next), start);
       continue;
     }
 
@@ -455,24 +477,26 @@ static Node *unary(const Token **rest, const Token *tok)
     return unary(rest, tok->next);
 
   if (equal(tok, "-"))
-    return new_unary(ND_NEG, unary(rest, tok->next), tok);
+    return new_unary(NODE_NEG, unary(rest, tok->next), tok);
   if (equal(tok, "&"))
-    return new_unary(ND_ADDR, unary(rest, tok->next), tok);
+    return new_unary(NODE_ADDR, unary(rest, tok->next), tok);
   if (equal(tok, "*"))
-    return new_unary(ND_DEREF, unary(rest, tok->next), tok);
+    return new_unary(NODE_DEREF, unary(rest, tok->next), tok);
 
   return primary(rest, tok);
 }
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
-static Node *funcall(const Token **rest,const Token *tok) {
+static Node *funcall(const Token **rest, const Token *tok)
+{
   const Token *start = tok;
   tok = tok->next->next;
 
   Node head = {0};
   Node *cur = &head;
 
-  while (!equal(tok, ")")) {
+  while (!equal(tok, ")"))
+  {
     if (cur != &head)
       tok = consume(tok, ",");
     cur = cur->next = assign(&tok, tok);
@@ -480,7 +504,7 @@ static Node *funcall(const Token **rest,const Token *tok) {
 
   *rest = consume(tok, ")");
 
-  Node *node = new_node(ND_FUNCALL, start);
+  Node *node = new_node(NODE_FUNCALL, start);
   node->funcname = strndup(start->loc, start->len);
   node->funcname_length = start->len;
   node->args = head.next;
@@ -497,7 +521,7 @@ static Node *primary(const Token **rest, const Token *tok)
     return node;
   }
 
-  if (tok->kind == TK_IDENT)
+  if (tok->kind == TOKEN_IDENT)
   {
     // Function call
     if (equal(tok->next, "("))
@@ -514,7 +538,7 @@ static Node *primary(const Token **rest, const Token *tok)
     return new_var_node(var, tok);
   }
 
-  if (tok->kind == TK_NUM)
+  if (tok->kind == TOKEN_NUM)
   {
     Node *node = new_num(tok->val, tok);
     *rest = tok->next;
@@ -525,7 +549,17 @@ static Node *primary(const Token **rest, const Token *tok)
   return NULL;
 }
 
-static Function *function(const Token **rest,const Token *tok) {
+static void create_param_lvars(Type *param)
+{
+  if (param)
+  {
+    create_param_lvars(param->next);
+    new_lvar(param, get_ident(param->name), param->name->len);
+  }
+}
+
+static Function *function(const Token **rest, const Token *tok)
+{
   Type *type = declspec(&tok, tok);
   type = declarator(&tok, tok, type);
 
@@ -535,6 +569,8 @@ static Function *function(const Token **rest,const Token *tok) {
   fn->next = NULL;
   fn->name = get_ident(type->name);
   fn->name_length = type->name->len;
+  create_param_lvars(type->params);
+  fn->params = locals;
 
   tok = consume(tok, "{");
   fn->body = compound_stmt(rest, tok);
@@ -548,7 +584,7 @@ Function *parse(const Token *tok)
 {
   Function head = {0};
   Function *cur = &head;
-  while (tok->kind != TK_EOF)
+  while (tok->kind != TOKEN_EOF)
   {
     cur = cur->next = function(&tok, tok);
   }
