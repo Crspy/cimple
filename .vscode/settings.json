@@ -6,6 +6,14 @@
         "string.h": "c",
         "stdlib.h": "c",
         "string_view": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "array": "c",
+        "compare": "c",
+        "functional": "c",
+        "istream": "c",
+        "ostream": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }

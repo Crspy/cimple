@@ -4,6 +4,8 @@
 // accumulated to this list.
 Obj *locals;
 
+static Type *declspec(const Token **rest, const Token *tok);
+static Type *declarator(const Token **rest, const Token *tok, Type *type);
 static Node *declaration(const Token **rest, const Token *tok);
 static Node *compound_stmt(const Token **rest, const Token *tok);
 static Node *stmt(const Token **rest, const Token *tok);
@@ -88,7 +90,18 @@ static Type *declspec(const Token **rest, const Token *tok)
   return type_int;
 }
 
-// declarator = "*"* ident
+// type-suffix = ("(" func-params)?
+static Type *type_suffix(const Token **rest,const Token *tok, Type *type) {
+  if (equal(tok, "(")) {
+    // TODO: parse parameters
+    *rest = consume(tok->next, ")");
+    return func_type(type);
+  }
+  *rest = tok;
+  return type;
+}
+
+// declarator = "*"* ident type-suffix
 static Type *declarator(const Token **rest, const Token *tok, Type *type)
 {
   while (match(&tok, tok, "*"))
@@ -99,8 +112,8 @@ static Type *declarator(const Token **rest, const Token *tok, Type *type)
   if (tok->kind != TK_IDENT)
     error_tok(tok, "expected a variable name");
 
+  type = type_suffix(rest,tok->next,type);
   type->name = tok;
-  *rest = tok->next;
   return type;
 }
 
@@ -469,7 +482,7 @@ static Node *funcall(const Token **rest,const Token *tok) {
 
   Node *node = new_node(ND_FUNCALL, start);
   node->funcname = strndup(start->loc, start->len);
-  node->funcnameLength = start->len;
+  node->funcname_length = start->len;
   node->args = head.next;
   return node;
 }
@@ -512,13 +525,32 @@ static Node *primary(const Token **rest, const Token *tok)
   return NULL;
 }
 
+static Function *function(const Token **rest,const Token *tok) {
+  Type *type = declspec(&tok, tok);
+  type = declarator(&tok, tok, type);
+
+  locals = NULL;
+
+  Function *fn = malloc(sizeof(Function));
+  fn->next = NULL;
+  fn->name = get_ident(type->name);
+  fn->name_length = type->name->len;
+
+  tok = consume(tok, "{");
+  fn->body = compound_stmt(rest, tok);
+  fn->locals = locals;
+  fn->stack_size = 0;
+  return fn;
+}
+
 // program = stmt*
 Function *parse(const Token *tok)
 {
-  tok = consume(tok, "{");
-  Function *prog = malloc(sizeof(Function));
-  prog->body = compound_stmt(&tok, tok);
-  prog->locals = locals;
-  prog->stack_size = 0;
-  return prog;
+  Function head = {0};
+  Function *cur = &head;
+  while (tok->kind != TK_EOF)
+  {
+    cur = cur->next = function(&tok, tok);
+  }
+  return head.next;
 }

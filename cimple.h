@@ -62,6 +62,9 @@ struct Obj
 typedef struct Function Function;
 struct Function
 {
+  Function *next;
+  char *name;
+  int name_length;
   Node *body;
   Obj *locals;
   int stack_size;
@@ -119,7 +122,7 @@ struct Node
   // Function call
   Node *args;
   char *funcname;
-  int funcnameLength;
+  int funcname_length;
 
   Obj *var; // Used if kind == ND_VAR
 
@@ -136,6 +139,7 @@ typedef enum
 {
   TY_INT,
   TY_PTR,
+  TY_FUNC
 } TypeKind;
 
 struct Type
@@ -147,12 +151,16 @@ struct Type
 
   // Declaration
   const Token *name;
+
+  // Function type
+  Type *return_type;
 };
 
 extern Type *type_int;
 
 bool is_integer(Type *ty);
 Type *pointer_to(Type *base);
+Type *func_type(Type *return_type);
 void add_type(Node *node);
 
 //

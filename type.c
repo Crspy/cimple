@@ -7,11 +7,17 @@ bool is_integer(Type *ty) {
 }
 
 Type *pointer_to(Type *base) {
-  Type *ty = malloc(sizeof(Type));
+  Type *ty = calloc(1,sizeof(Type));
   ty->kind = TY_PTR;
   ty->base = base;
-  ty->name = NULL;
   return ty;
+}
+
+Type *func_type(Type *return_type) {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TY_FUNC;
+  type->return_type = return_type;
+  return type;
 }
 
 void add_type(Node *node) {
