@@ -16,6 +16,7 @@ static Node *equality(const Token **rest, const Token *tok);
 static Node *comparison(const Token **rest, const Token *tok);
 static Node *term(const Token **rest, const Token *tok);
 static Node *factor(const Token **rest, const Token *tok);
+static Node *postfix(const Token **rest,const Token *tok);
 static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 
@@ -491,7 +492,7 @@ static Node *factor(const Token **rest, const Token *tok)
 }
 
 // unary = ("+" | "-" | "*" | "&") unary
-//       | primary
+//       | postfix
 static Node *unary(const Token **rest, const Token *tok)
 {
   if (equal(tok, "+"))
@@ -504,7 +505,22 @@ static Node *unary(const Token **rest, const Token *tok)
   if (equal(tok, "*"))
     return new_unary(NODE_DEREF, unary(rest, tok->next), tok);
 
-  return primary(rest, tok);
+  return postfix(rest, tok);
+}
+
+// postfix = primary ("[" expr "]")*
+static Node *postfix(const Token **rest,const Token *tok) {
+  Node *node = primary(&tok, tok);
+
+  while (equal(tok, "[")) {
+    // x[y] is short for *(x+y)
+    const Token *start = tok;
+    Node *idx = expr(&tok, tok->next);
+    tok = consume(tok, "]");
+    node = new_unary(NODE_DEREF, new_add(node, idx, start), start);
+  }
+  *rest = tok;
+  return node;
 }
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
