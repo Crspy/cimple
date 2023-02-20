@@ -1,32 +1,53 @@
 #include "cimple.h"
 
-Type *type_int = &(Type){TYPE_INT};
+static Type type_int = {.kind = TYPE_INT, .size = 8};
 
-bool is_integer(Type *type) {
+Type *int_type()
+{
+  return &type_int;
+}
+
+bool is_integer(Type *type)
+{
   return type->kind == TYPE_INT;
 }
 
-Type *copy_type(Type *type) {
+Type *copy_type(Type *type)
+{
   Type *ret = malloc(sizeof(Type));
   *ret = *type;
   return ret;
 }
 
-Type *pointer_to(Type *base) {
-  Type *type = calloc(1,sizeof(Type));
+Type *pointer_to(Type *base)
+{
+  Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_PTR;
+  type->size = 8;
   type->base = base;
   return type;
 }
 
-Type *func_type(Type *return_type) {
+Type *func_type(Type *return_type)
+{
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_FUNC;
   type->return_type = return_type;
   return type;
 }
 
-void add_type(Node *node) {
+Type *array_of(Type *base, int len)
+{
+  Type *ty = calloc(1, sizeof(Type));
+  ty->kind = TYPE_ARRAY;
+  ty->size = base->size * len;
+  ty->base = base;
+  ty->array_length = len;
+  return ty;
+}
+
+void add_type(Node *node)
+{
   if (!node || node->type)
     return;
 
@@ -37,11 +58,10 @@ void add_type(Node *node) {
 
   add_type(node->then_stmt);
   add_type(node->cond_expr);
-  
-  
+
   add_type(node->init_expr);
   add_type(node->inc_expr);
-  
+
   for (Node *n = node->body; n; n = n->next)
   {
     add_type(n);
@@ -52,14 +72,21 @@ void add_type(Node *node) {
     add_type(n);
   }
 
-  switch (node->kind) {
+  switch (node->kind)
+  {
   case NODE_ADD:
   case NODE_SUB:
   case NODE_MUL:
   case NODE_DIV:
   case NODE_NEG:
-  case NODE_ASSIGN:
     // TODO: add warnings about incompatible (pointer?) types
+    node->type = node->lhs->type;
+    return;
+  case NODE_ASSIGN:
+    if (node->lhs->type->kind == TYPE_ARRAY)
+    {
+      error_tok(node->lhs->tok, "not an lvalue");
+    }
     node->type = node->lhs->type;
     return;
   case NODE_EQ:
@@ -68,16 +95,28 @@ void add_type(Node *node) {
   case NODE_LE:
   case NODE_NUM:
   case NODE_FUNCALL:
-    node->type = type_int;
+    node->type = int_type();
     return;
   case NODE_VAR:
     node->type = node->var->type;
     break;
   case NODE_ADDR:
-    node->type = pointer_to(node->lhs->type);
+    if (node->lhs->type->kind == TYPE_ARRAY)
+    {
+      /*
+      *   int arr[2];
+      *   int* p = &arr;
+      */
+      node->type = pointer_to(node->lhs->type->base);
+    }
+    else
+    {
+      node->type = pointer_to(node->lhs->type);
+    }
     return;
   case NODE_DEREF:
-    if (node->lhs->type->kind != TYPE_PTR)
+    // only pointer and array types have a base
+    if (node->lhs->type->base == NULL)
     {
       error_tok(node->tok, "invalid pointer dereference");
     }

@@ -79,46 +79,66 @@ static Obj *new_lvar(Type *type, const char *name, int len)
 static const char *get_ident(const Token *tok)
 {
   if (tok->kind != TOKEN_IDENT)
+  {
     error_tok(tok, "expected an identifier");
+  }
   return strndup(tok->loc, tok->len);
+}
+
+static int get_number(const Token *tok)
+{
+  if (tok->kind != TOKEN_NUM)
+  {
+    error_tok(tok, "expected a number");
+  }
+  return tok->val;
 }
 
 // declspec = "int"
 static Type *declspec(const Token **rest, const Token *tok)
 {
   *rest = consume(tok, "int");
-  return type_int;
+  return int_type();
 }
 
-// type-suffix = ("(" func-params? ")")?
-// func-params = param ("," param)*
+// func-params = (param ("," param)*)? ")"
 // param       = declspec declarator
-static Type *type_suffix(const Token **rest, const Token *tok, Type *type)
+static Type *func_params(const Token **rest, const Token *tok, Type *return_type)
 {
-  if (equal(tok, "("))
+  Type head = {0};
+  Type *cur = &head;
+
+  while (!equal(tok, ")"))
   {
-    tok = tok->next;
-
-    Type head = {0};
-    Type *cur = &head;
-
-    while (!equal(tok, ")"))
+    if (cur != &head)
     {
-      if (cur != &head)
-      {
-        tok = consume(tok, ",");
-      }
-
-      Type *base_type = declspec(&tok, tok);
-      Type *type = declarator(&tok, tok, base_type);
-      cur = cur->next = copy_type(type);
+      tok = consume(tok, ",");
     }
 
-    type = func_type(type);
-    type->params = head.next;
-    *rest = tok->next;
-    return type;
+    Type *base_type = declspec(&tok, tok);
+    Type *type = declarator(&tok, tok, base_type);
+    cur = cur->next = copy_type(type);
   }
+
+  Type* type = func_type(return_type);
+  type->params = head.next;
+  *rest = tok->next;
+  return type;
+}
+
+// type-suffix = "(" func-params
+//             | "[" num "]"
+//             | ε
+static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
+  if (equal(tok, "("))
+    return func_params(rest, tok->next, type);
+
+  if (equal(tok, "[")) {
+    int array_count = get_number(tok->next);
+    *rest = consume(tok->next->next, "]");
+    return array_of(type, array_count);
+  }
+
   *rest = tok;
   return type;
 }
@@ -380,7 +400,7 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
   }
 
   // ptr + num
-  rhs = new_binary(NODE_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+  rhs = new_binary(NODE_MUL, rhs, new_num(lhs->type->base->size, tok), tok); // TODO: make this a right left (<<) by n instead
   return new_binary(NODE_ADD, lhs, rhs, tok);
 }
 
@@ -397,7 +417,7 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
   // ptr - num
   if (lhs->type->base && is_integer(rhs->type))
   {
-    rhs = new_binary(NODE_MUL, rhs, new_num(8, tok), tok); // TODO: make this a right left (<<) by n instead
+    rhs = new_binary(NODE_MUL, rhs, new_num(lhs->type->base->size, tok), tok); // TODO: make this a right left (<<) by n instead
     add_type(rhs);
     Node *node = new_binary(NODE_SUB, lhs, rhs, tok);
     node->type = lhs->type;
@@ -408,10 +428,10 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
   if (lhs->type->base && rhs->type->base)
   {
     Node *node = new_binary(NODE_SUB, lhs, rhs, tok);
-    node->type = type_int;
+    node->type = int_type();
 
     // TODO: make this a right shift (>>) by n instead
-    return new_binary(NODE_DIV, node, new_num(8, tok), tok);
+    return new_binary(NODE_DIV, node, new_num(lhs->type->base->size, tok), tok);
   }
 
   error_tok(tok, "invalid operands");

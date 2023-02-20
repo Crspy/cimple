@@ -54,6 +54,28 @@ static void gen_addr(Node *node)
   error_tok(node->tok, "not an lvalue");
 }
 
+// Load a value from where %rax is pointing to.
+static void load(Type *ty) {
+  if (ty->kind == TYPE_ARRAY) {
+    // If it is an array, do not attempt to load a value to the
+    // register because in general we can't load an entire array to a
+    // register. As a result, the result of an evaluation of an array
+    // becomes not the array itself but the address of the array.
+    // This is where "array is automatically converted to a pointer to
+    // the first element of the array in C" occurs.
+    return;
+  }
+
+  printf("\tmov (%%rax), %%rax\n");
+}
+
+// Store %rax to an address that the stack top is pointing to.
+static void store(void) {
+  pop("%rdi");
+  printf("\tmov %%rax, (%%rdi)\n");
+}
+
+
 static void gen_expr(Node *node)
 {
   switch (node->kind)
@@ -67,11 +89,11 @@ static void gen_expr(Node *node)
     return;
   case NODE_VAR:
     gen_addr(node);
-    printf("\tmov (%%rax), %%rax\n");
+    load(node->type);
     return;
   case NODE_DEREF:
     gen_expr(node->lhs);
-    printf("\tmov (%%rax), %%rax\n");
+    load(node->type);
     return;
   case NODE_ADDR:
     gen_addr(node->lhs);
@@ -80,8 +102,7 @@ static void gen_expr(Node *node)
     gen_addr(node->lhs);
     push(); // push the address of the local variable
     gen_expr(node->rhs);
-    pop("%rdi"); // pop the address of the local variable
-    printf("\tmov %%rax, (%%rdi)\n");
+    store();
     return;
   case NODE_FUNCALL:
   {
@@ -209,7 +230,7 @@ static void assign_lvar_offsets(Function *prog)
     int offset = 0;
     for (Obj *var = fn->locals; var; var = var->next)
     {
-      offset += 8;
+      offset += var->type->size;
       var->offset = -offset;
     }
     fn->stack_size = align_to(offset, 16);
