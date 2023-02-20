@@ -127,7 +127,7 @@ static Type *func_params(const Token **rest, const Token *tok, Type *return_type
 }
 
 // type-suffix = "(" func-params
-//             | "[" num "]"
+//             | "[" num "]" type-suffix
 //             | ε
 static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
   if (equal(tok, "("))
@@ -135,7 +135,8 @@ static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
 
   if (equal(tok, "[")) {
     int array_count = get_number(tok->next);
-    *rest = consume(tok->next->next, "]");
+    tok = consume(tok->next->next, "]");
+    type = type_suffix(rest,tok,type);
     return array_of(type, array_count);
   }
 
