@@ -16,7 +16,7 @@ static Node *equality(const Token **rest, const Token *tok);
 static Node *comparison(const Token **rest, const Token *tok);
 static Node *term(const Token **rest, const Token *tok);
 static Node *factor(const Token **rest, const Token *tok);
-static Node *postfix(const Token **rest,const Token *tok);
+static Node *postfix(const Token **rest, const Token *tok);
 static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 
@@ -121,7 +121,7 @@ static Type *func_params(const Token **rest, const Token *tok, Type *return_type
     cur = cur->next = copy_type(type);
   }
 
-  Type* type = func_type(return_type);
+  Type *type = func_type(return_type);
   type->params = head.next;
   *rest = tok->next;
   return type;
@@ -130,14 +130,16 @@ static Type *func_params(const Token **rest, const Token *tok, Type *return_type
 // type-suffix = "(" func-params
 //             | "[" num "]" type-suffix
 //             | ε
-static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
+static Type *type_suffix(const Token **rest, const Token *tok, Type *type)
+{
   if (equal(tok, "("))
     return func_params(rest, tok->next, type);
 
-  if (equal(tok, "[")) {
+  if (equal(tok, "["))
+  {
     int array_count = get_number(tok->next);
     tok = consume(tok->next->next, "]");
-    type = type_suffix(rest,tok,type);
+    type = type_suffix(rest, tok, type);
     return array_of(type, array_count);
   }
 
@@ -509,10 +511,12 @@ static Node *unary(const Token **rest, const Token *tok)
 }
 
 // postfix = primary ("[" expr "]")*
-static Node *postfix(const Token **rest,const Token *tok) {
+static Node *postfix(const Token **rest, const Token *tok)
+{
   Node *node = primary(&tok, tok);
 
-  while (equal(tok, "[")) {
+  while (equal(tok, "["))
+  {
     // x[y] is short for *(x+y)
     const Token *start = tok;
     Node *idx = expr(&tok, tok->next);
@@ -548,7 +552,7 @@ static Node *funcall(const Token **rest, const Token *tok)
   return node;
 }
 
-// primary = "(" expr ")" | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
 static Node *primary(const Token **rest, const Token *tok)
 {
   if (equal(tok, "("))
@@ -556,6 +560,13 @@ static Node *primary(const Token **rest, const Token *tok)
     Node *node = expr(&tok, tok->next);
     *rest = consume(tok, ")");
     return node;
+  }
+
+  if (equal(tok, "sizeof"))
+  {
+    Node *node = unary(rest, tok->next);
+    add_type(node);
+    return new_num(node->type->size, tok);
   }
 
   if (tok->kind == TOKEN_IDENT)
