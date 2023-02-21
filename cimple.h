@@ -19,6 +19,7 @@ typedef enum {
   TOKEN_IDENT,   // Identifiers
   TOKEN_PUNCT,   // Punctuators
   TOKEN_KEYWORD, // Keywords
+  TOKEN_STR,     // String literals
   TOKEN_NUM,     // Numeric literals
   TOKEN_EOF,     // End-of-file markers
 } TokenKind;
@@ -31,6 +32,8 @@ struct Token {
   int val;         // If kind is TOKEN_NUM, its value
   const char *loc; // Token location
   int len;         // Token length
+  Type *type;      // Used if TOKENK_STR
+  char *str;       // String literal contents including terminating '\0'
 };
 
 void error(const char *fmt, ...);
@@ -59,6 +62,9 @@ struct Obj {
 
   // Global variable or function
   bool is_function;
+
+  // Global variable
+  char *init_data;
 
   // Function
   Obj *params;

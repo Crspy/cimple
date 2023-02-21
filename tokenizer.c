@@ -23,13 +23,13 @@ static void verror_at(const char *loc, const char *fmt, va_list ap) {
   exit(1);
 }
 
-void error_at(const char *loc,const char *fmt, ...) {
+void error_at(const char *loc, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(loc, fmt, ap);
 }
 
-void error_tok(const Token *tok,const char *fmt, ...) {
+void error_tok(const Token *tok, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(tok->loc, fmt, ap);
@@ -41,7 +41,7 @@ bool equal(const Token *tok, const char *op) {
 }
 
 // Ensure that the current token is `op`.
-Token *consume(const Token *tok,const char *op) {
+Token *consume(const Token *tok, const char *op) {
   if (!equal(tok, op))
     error_tok(tok, "expected '%s'", op);
   return tok->next;
@@ -49,7 +49,7 @@ Token *consume(const Token *tok,const char *op) {
 
 // tries to consume the current token if it is equal to `str` and returns true
 // otherwise returns false
-bool match(const Token **rest,const Token *tok,const char *str) {
+bool match(const Token **rest, const Token *tok, const char *str) {
   if (equal(tok, str)) {
     *rest = tok->next;
     return true;
@@ -59,7 +59,7 @@ bool match(const Token **rest,const Token *tok,const char *str) {
 }
 
 // Create a new token.
-static Token *new_token(TokenKind kind, const char *start,const char *end) {
+static Token *new_token(TokenKind kind, const char *start, const char *end) {
   Token *tok = malloc(sizeof(Token));
   tok->kind = kind;
   tok->loc = start;
@@ -68,7 +68,7 @@ static Token *new_token(TokenKind kind, const char *start,const char *end) {
   return tok;
 }
 
-static bool startswith(const char *p,const char *q) {
+static bool startswith(const char *p, const char *q) {
   return strncmp(p, q, strlen(q)) == 0;
 }
 
@@ -78,21 +78,20 @@ static bool is_ident1(char c) {
 }
 
 // Returns true if c is valid as a non-first character of an identifier.
-static bool is_ident2(char c) {
-  return is_ident1(c) || ('0' <= c && c <= '9');
-}
+static bool is_ident2(char c) { return is_ident1(c) || ('0' <= c && c <= '9'); }
 
 // Read a punctuator token from p and returns its length.
 static int read_punct(const char *p) {
-  if (startswith(p, "==") || startswith(p, "!=") ||
-      startswith(p, "<=") || startswith(p, ">="))
+  if (startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") ||
+      startswith(p, ">="))
     return 2;
 
   return ispunct(*p) ? 1 : 0;
 }
 
 static bool is_keyword(Token *tok) {
-  static char *kw[] = {"return", "if", "else","for" , "while" , "int","char","sizeof"};
+  static char *kw[] = {"return", "if",  "else", "for",
+                       "while",  "int", "char", "sizeof"};
 
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     if (equal(tok, kw[i]))
@@ -100,11 +99,21 @@ static bool is_keyword(Token *tok) {
   return false;
 }
 
+static Token *read_string_literal(const char *start) {
+  const char *p = start + 1;
+  for (; *p != '"'; p++)
+    if (*p == '\n' || *p == '\0')
+      error_at(start, "unterminated string literal");
+
+  Token *tok = new_token(TOKEN_STR, start, p + 1);
+  tok->type = array_of(char_type(), p - start);
+  tok->str = strndup(start + 1, p - start - 1);
+  return tok;
+}
+
 static void convert_keywords(Token *tok) {
-  for (Token *t = tok; t->kind != TOKEN_EOF; t = t->next)
-  {
-    if (is_keyword(t))
-    {
+  for (Token *t = tok; t->kind != TOKEN_EOF; t = t->next) {
+    if (is_keyword(t)) {
       t->kind = TOKEN_KEYWORD;
     }
   }
@@ -127,8 +136,15 @@ Token *tokenize(const char *p) {
     if (isdigit(*p)) {
       cur = cur->next = new_token(TOKEN_NUM, p, p);
       const char *num_start = p;
-      cur->val = strtoul(p,(char**) &p, 10);
+      cur->val = strtoul(p, (char **)&p, 10);
       cur->len = p - num_start;
+      continue;
+    }
+
+    // String literal
+    if (*p == '"') {
+      cur = cur->next = read_string_literal(p);
+      p += cur->len;
       continue;
     }
 

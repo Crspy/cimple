@@ -282,7 +282,13 @@ static void emit_data(Obj *prog) {
     printf(".data\n");
     printf(".globl %s\n", var->name);
     printf("%s:\n", var->name);
-    printf("\t.zero %d\n", var->type->size);
+    if (var->init_data) {
+      for (int i = 0; i < var->type->size; i++) {
+        printf("\t.byte %d\n", var->init_data[i]);
+      }
+    } else {
+      printf("\t.zero %d\n", var->type->size);
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 #include "cimple.h"
 
-//static Type type_int = {.kind = TYPE_INT, .size = 8};
+/*static Type type_int = {.kind = TYPE_INT, .size = 8};*/
+
 
 Type *char_type() { 
   Type *type = calloc(1, sizeof(Type)); 

@@ -128,6 +128,23 @@ static Obj *new_gvar(Type *type, const char *name, int name_len) {
   return var;
 }
 
+static char *new_unique_name() {
+  static int id = 0;
+  char *buf = calloc(1, 24); // digitsCount(int64) + ".L.." = 24
+  sprintf(buf, ".L..%d", id++);
+  return buf;
+}
+
+static Obj *new_anon_gvar(Type *type) {
+  char *unique_name = new_unique_name();
+  return new_gvar(type, unique_name, strlen(unique_name));
+}
+static Obj *new_string_literal(char *str, Type *type) {
+  Obj *var = new_anon_gvar(type);
+  var->init_data = str;
+  return var;
+}
+
 static const char *get_ident(const Token *tok) {
   if (tok->kind != TOKEN_IDENT) {
     error_tok(tok, "expected an identifier");
@@ -578,7 +595,7 @@ static Node *funcall(const Token **rest, const Token *tok) {
   return node;
 }
 
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
 static Node *primary(const Token **rest, const Token *tok) {
   if (equal(tok, "(")) {
     Node *node = expr(&tok, tok->next);
@@ -602,6 +619,12 @@ static Node *primary(const Token **rest, const Token *tok) {
     if (!var) {
       error_tok(tok, "undefined variable");
     }
+    *rest = tok->next;
+    return new_var_node(var, tok);
+  }
+
+  if (tok->kind == TOKEN_STR) {
+    Obj *var = new_string_literal(tok->str, tok->type);
     *rest = tok->next;
     return new_var_node(var, tok);
   }
