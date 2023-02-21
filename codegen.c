@@ -1,7 +1,8 @@
 #include "cimple.h"
 
 static int depth;
-static char *argreg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
+static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
 
 static void gen_expr(Node *node);
@@ -60,8 +61,8 @@ static void gen_addr(Node *node) {
 }
 
 // Load a value from where %rax is pointing to.
-static void load(Type *ty) {
-  if (ty->kind == TYPE_ARRAY) {
+static void load(Type *type) {
+  if (type->kind == TYPE_ARRAY) {
     // If it is an array, do not attempt to load a value to the
     // register because in general we can't load an entire array to a
     // register. As a result, the result of an evaluation of an array
@@ -71,13 +72,20 @@ static void load(Type *ty) {
     return;
   }
 
-  printf("\tmov (%%rax), %%rax\n");
+  if (type->size == 1)
+    printf("\tmovsbq (%%rax), %%rax\n");
+  else
+    printf("\tmov (%%rax), %%rax\n");
 }
 
 // Store %rax to an address that the stack top is pointing to.
-static void store(void) {
+static void store(Type *type) {
   pop("%rdi");
-  printf("\tmov %%rax, (%%rdi)\n");
+
+  if (type->size == 1)
+    printf("\tmov %%al, (%%rdi)\n");
+  else
+    printf("\tmov %%rax, (%%rdi)\n");
 }
 
 static void gen_expr(Node *node) {
@@ -110,7 +118,7 @@ static void gen_expr(Node *node) {
       gen_addr(binary->lhs);
       push(); // push the address of the local variable
       gen_expr(binary->rhs);
-      store();
+      store(node->type);
       return;
     }
 
@@ -165,7 +173,7 @@ static void gen_expr(Node *node) {
     }
 
     for (int i = nargs - 1; i >= 0; i--)
-      pop(argreg[i]);
+      pop(argreg64[i]);
 
     printf("\tmov $0, %%rax\n");
     printf("\tcall %s\n", fun_call->funcname);
@@ -299,7 +307,10 @@ static void emit_text(Obj *prog) {
     // Save passed-by-register arguments to the stack
     int i = 0;
     for (Obj *var = fn->params; var; var = var->next) {
-      printf("\tmov %s, %d(%%rbp)\n", argreg[i++], var->offset);
+      if (var->type->size == 1)
+        printf("\tmov %s, %d(%%rbp)\n", argreg8[i++], var->offset);
+      else
+        printf("\tmov %s, %d(%%rbp)\n", argreg64[i++], var->offset);
     }
 
     // Emit code

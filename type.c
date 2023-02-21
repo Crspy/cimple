@@ -1,10 +1,22 @@
 #include "cimple.h"
 
-static Type type_int = {.kind = TYPE_INT, .size = 8};
+//static Type type_int = {.kind = TYPE_INT, .size = 8};
 
-Type *int_type() { return &type_int; }
+Type *char_type() { 
+  Type *type = calloc(1, sizeof(Type)); 
+  type->kind = TYPE_CHAR;
+  type->size = 1;
+  return type;
+}
 
-bool is_integer(Type *type) { return type->kind == TYPE_INT; }
+Type *int_type() { 
+  Type *type = calloc(1, sizeof(Type)); 
+  type->kind = TYPE_INT;
+  type->size = 8;
+  return type;
+}
+
+bool is_integer(Type *type) { return type->kind == TYPE_INT || type->kind == TYPE_CHAR; }
 
 Type *copy_type(Type *type) {
   Type *ret = malloc(sizeof(Type));

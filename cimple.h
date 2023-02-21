@@ -1,5 +1,6 @@
 #ifndef CIMPLE_HEADER_GUARD
 #define CIMPLE_HEADER_GUARD
+#include "string_ext.h"
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "string_ext.h"
 
 typedef struct Type Type;
 typedef struct Node Node;
@@ -15,8 +15,7 @@ typedef struct Node Node;
 //
 // tokenizer.c
 //
-typedef enum
-{
+typedef enum {
   TOKEN_IDENT,   // Identifiers
   TOKEN_PUNCT,   // Punctuators
   TOKEN_KEYWORD, // Keywords
@@ -26,8 +25,7 @@ typedef enum
 
 // Token type
 typedef struct Token Token;
-struct Token
-{
+struct Token {
   TokenKind kind;  // Token kind
   Token *next;     // Next token
   int val;         // If kind is TOKEN_NUM, its value
@@ -49,8 +47,7 @@ Token *tokenize(const char *input);
 
 // Variable or function
 typedef struct Obj Obj;
-struct Obj
-{
+struct Obj {
   Obj *next;
   const char *name; // Variable name
   int name_length;  // Variable name length
@@ -71,10 +68,8 @@ struct Obj
 };
 
 // AST node type
-struct Node
-{
-  enum NodeTag
-  {
+struct Node {
+  enum NodeTag {
     NODE_TAG_UNARY,
     NODE_TAG_BINARY,
     NODE_TAG_IF,
@@ -89,23 +84,20 @@ struct Node
   const Token *tok; // Representative token
 };
 
-typedef enum
-{
+typedef enum {
   NODE_NEG,       // unary -
   NODE_ADDR,      // unary &
   NODE_DEREF,     // unary *
   NODE_EXPR_STMT, // Expression statement
   NODE_RETURN,    // "return"
 } UnaryKind;
-struct UnaryNode
-{
+struct UnaryNode {
   Node node;
   UnaryKind kind;
   Node *expr;
 };
 
-typedef enum
-{
+typedef enum {
   NODE_ADD,    // +
   NODE_SUB,    // -
   NODE_MUL,    // *
@@ -116,47 +108,40 @@ typedef enum
   NODE_LE,     // <=
   NODE_ASSIGN, // =
 } BinaryKind;
-struct BinaryNode
-{
+struct BinaryNode {
   Node node;
   BinaryKind kind;
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
 };
-struct IfNode
-{
+struct IfNode {
   Node node;
   Node *cond_expr;
   Node *then_stmt;
   Node *else_stmt;
 };
-struct ForNode
-{
+struct ForNode {
   Node node;
   Node *init_expr;
   Node *cond_expr;
   Node *inc_expr;
   Node *body_stmt;
 };
-struct BlockNode
-{
+struct BlockNode {
   Node node;
   Node *body;
 };
-struct FunCallNode
-{
+struct FunCallNode {
   Node node;
   Node *args;
   const char *funcname;
   int funcname_length;
 };
-struct VarNode
-{
+struct VarNode {
   Node node;
   Obj *var;
 };
-struct NumNode
-{
+struct NumNode {
   Node node;
   int val;
 };
@@ -167,16 +152,15 @@ Obj *parse(const Token *tok);
 // type.c
 //
 
-typedef enum
-{
+typedef enum {
+  TYPE_CHAR,
   TYPE_INT,
   TYPE_PTR,
   TYPE_FUNC,
   TYPE_ARRAY,
 } TypeKind;
 
-struct Type
-{
+struct Type {
   TypeKind kind;
 
   int size; // sizeof() value
@@ -202,8 +186,9 @@ struct Type
   Type *next;
 };
 
-bool is_integer(Type *type);
 Type *int_type();
+Type *char_type();
+bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
