@@ -8,7 +8,7 @@ all: cimple
 test:
 	./test.sh
 
-%.o : %.c
+%.o : %.c Makefile
 	$(CC) $(CFLAGS) $(INCS) -c $< -o $@
 
 cimple: $(OBJS)

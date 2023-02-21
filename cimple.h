@@ -70,64 +70,95 @@ struct Obj
   int stack_size;
 };
 
-
 // AST node type
-typedef enum
-{
-  NODE_ADD,       // +
-  NODE_SUB,       // -
-  NODE_MUL,       // *
-  NODE_DIV,       // /
-  NODE_NEG,       // unary -
-  NODE_EQ,        // ==
-  NODE_NE,        // !=
-  NODE_LT,        // <
-  NODE_LE,        // <=
-  NODE_ASSIGN,    // =
-  NODE_ADDR,      // unary &
-  NODE_DEREF,     // unary *
-  NODE_RETURN,    // "return"
-  NODE_IF,        // "if"
-  NODE_FOR,       // "for" or "while"
-  NODE_BLOCK,     // { ... }
-  NODE_FUNCALL,   // Function call
-  NODE_EXPR_STMT, // Expression statement
-  NODE_VAR,       // Variable
-  NODE_NUM,       // Integer
-} NodeKind;
-
 struct Node
 {
-  NodeKind kind;    // Node kind
+  enum NodeTag
+  {
+    NODE_TAG_UNARY,
+    NODE_TAG_BINARY,
+    NODE_TAG_IF,
+    NODE_TAG_FOR,
+    NODE_TAG_BLOCK,
+    NODE_TAG_FUNCALL,
+    NODE_TAG_VAR,
+    NODE_TAG_NUM
+  } tag;
   Node *next;       // Next node
   Type *type;       // Type, e.g. int or pointer to int
   const Token *tok; // Representative token
+};
 
+typedef enum
+{
+  NODE_NEG,       // unary -
+  NODE_ADDR,      // unary &
+  NODE_DEREF,     // unary *
+  NODE_EXPR_STMT, // Expression statement
+  NODE_RETURN,    // "return"
+} UnaryKind;
+struct UnaryNode
+{
+  Node node;
+  UnaryKind kind;
+  Node *expr;
+};
+
+typedef enum
+{
+  NODE_ADD,    // +
+  NODE_SUB,    // -
+  NODE_MUL,    // *
+  NODE_DIV,    // /
+  NODE_EQ,     // ==
+  NODE_NE,     // !=
+  NODE_LT,     // <
+  NODE_LE,     // <=
+  NODE_ASSIGN, // =
+} BinaryKind;
+struct BinaryNode
+{
+  Node node;
+  BinaryKind kind;
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
-
-  // "if" statement
-  Node *else_stmt;
-
-  // "if" statement or "for" statement
-  Node *then_stmt;
+};
+struct IfNode
+{
+  Node node;
   Node *cond_expr;
-
-  // "for" statement
+  Node *then_stmt;
+  Node *else_stmt;
+};
+struct ForNode
+{
+  Node node;
   Node *init_expr;
+  Node *cond_expr;
   Node *inc_expr;
-
-  // Block
-  Node *body; // Used if kind == NODE_BLOCK
-
-  // Function call
+  Node *body_stmt;
+};
+struct BlockNode
+{
+  Node node;
+  Node *body;
+};
+struct FunCallNode
+{
+  Node node;
   Node *args;
-  char *funcname;
+  const char *funcname;
   int funcname_length;
-
-  Obj *var; // Used if kind == NODE_VAR
-
-  int val; // Used if kind == NODE_NUM
+};
+struct VarNode
+{
+  Node node;
+  Obj *var;
+};
+struct NumNode
+{
+  Node node;
+  int val;
 };
 
 Obj *parse(const Token *tok);
