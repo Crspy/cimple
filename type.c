@@ -49,7 +49,7 @@ Type *array_of(Type *base, int len) {
   return ty;
 }
 
-void add_type(Node *node) {
+void add_type(struct Node *node) {
   if (!node || node->type)
     return;
 
