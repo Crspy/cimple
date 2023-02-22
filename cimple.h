@@ -2,6 +2,7 @@
 #define CIMPLE_HEADER_GUARD
 #include "string_ext.h"
 #include <assert.h>
+#include <errno.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>

@@ -1,5 +1,8 @@
 #include "cimple.h"
 
+// Input filename
+static const char *current_filename;
+
 // Input string
 static const char *current_input;
 
@@ -12,12 +15,34 @@ void error(const char *fmt, ...) {
   exit(1);
 }
 
-// Reports an error location and exit.
-static void verror_at(const char *loc, const char *fmt, va_list ap) {
-  int pos = loc - current_input;
-  fprintf(stderr, "%s\n", current_input);
-  fprintf(stderr, "%*s", pos, ""); // print pos spaces.
-  fprintf(stderr, "^ ");
+// Reports an error message in the following format and exit.
+//
+// foo.c:10: x = y + 1;
+//               ^ <error message here>
+static void verror_at(const char *loc,const char *fmt, va_list ap) {
+  // Find a line containing `loc`.
+  const char *line = loc;
+  while (current_input < line && line[-1] != '\n')
+    line--;
+
+  const char *end = loc;
+  while (*end != '\n')
+    end++;
+
+  // Get a line number.
+  int line_no = 1;
+  for (const char *p = current_input; p < line; p++)
+    if (*p == '\n')
+      line_no++;
+
+  // Print out the line.
+  int indent = fprintf(stderr, "%s:%d: ", current_filename, line_no);
+  fprintf(stderr, "%.*s\n", (int)(end - line), line);
+
+  // Show the error message.
+  int pos = loc - line + indent;
+
+  fprintf(stderr, "%*s^ ", pos, ""); // print pos spaces.
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
   exit(1);
@@ -204,7 +229,8 @@ static void convert_keywords(Token *tok) {
 }
 
 // Tokenize `current_input` and returns new tokens.
-Token *tokenize(const char *p) {
+static Token *tokenize(const char *filename, const char *p) {
+  current_filename = filename;
   current_input = p;
   Token head = {0};
   Token *cur = &head;
@@ -256,4 +282,59 @@ Token *tokenize(const char *p) {
   cur = cur->next = new_token(TOKEN_EOF, p, p);
   convert_keywords(head.next);
   return head.next;
+}
+
+// Returns the contents of a given file.
+static char *read_file(const char *path) {
+  FILE *fp;
+
+  if (strcmp(path, "-") == 0) {
+    // By convention, read from stdin if a given filename is "-".
+    fp = stdin;
+  } else {
+    fp = fopen(path, "r");
+    if (!fp)
+      error("cannot open %s: %s", path, strerror(errno));
+  }
+
+  size_t buf_size = 1024;
+  char *buf = malloc(buf_size);
+  if (buf == NULL) {
+    perror("Failed to allocate enough memory to read input");
+    exit(1);
+  }
+  size_t buflen = 0;
+
+  // Read the entire file.
+  char buf2[4096];
+  for (;;) {
+    int n = fread(buf2, 1, sizeof(buf2), fp);
+    if (n == 0)
+      break;
+    size_t needed_size = n + buflen + 2; // +2  for '\n' + '\0'
+    if (needed_size > buf_size) {
+      buf = realloc(buf, needed_size);
+      if (buf == NULL) {
+        perror("Failed to allocate enough memory to read input");
+        exit(1);
+      }
+      buf_size = needed_size;
+    }
+    memcpy(buf + buflen, buf2, n);
+    buflen += n;
+  }
+
+  if (fp != stdin)
+    fclose(fp);
+
+  // Make sure that the last line is properly terminated with '\n'.
+  // fflush(out);
+  if (buflen == 0 || buf[buflen - 1] != '\n')
+    buf[buflen] = '\n';
+  buf[buflen] = '\0';
+  return buf;
+}
+
+Token *tokenize_file(const char *path) {
+  return tokenize(path, read_file(path));
 }
