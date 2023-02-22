@@ -1,13 +1,23 @@
 #include "ast_node.h"
 #include "cimple.h"
+#include <stdio.h>
 
 static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
+static FILE *output_file;
 
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
+
+static void emitln(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(output_file, fmt, ap);
+  va_end(ap);
+  fputc('\n',output_file );
+}
 
 static int count(void) {
   static int i = 1;
@@ -15,12 +25,12 @@ static int count(void) {
 }
 
 static void push(void) {
-  printf("\tpush %%rax\n");
+  emitln("\tpush %%rax");
   depth++;
 }
 
 static void pop(char *arg) {
-  printf("\tpop %s\n", arg);
+  emitln("\tpop %s", arg);
   depth--;
 }
 
@@ -41,10 +51,10 @@ static void gen_addr(Node *node) {
     struct VarNode *var_node = (struct VarNode *)node;
     if (var_node->var->is_local) {
       // Local variable
-      printf("\tlea %d(%%rbp), %%rax\n", var_node->var->offset);
+      emitln("\tlea %d(%%rbp), %%rax", var_node->var->offset);
     } else {
       // Global variable
-      printf("\tlea %s(%%rip), %%rax\n", var_node->var->name);
+      emitln("\tlea %s(%%rip), %%rax", var_node->var->name);
     }
     return;
   }
@@ -75,9 +85,9 @@ static void load(Type *type) {
   }
 
   if (type->size == 1)
-    printf("\tmovsbq (%%rax), %%rax\n");
+    emitln("\tmovsbq (%%rax), %%rax");
   else
-    printf("\tmov (%%rax), %%rax\n");
+    emitln("\tmov (%%rax), %%rax");
 }
 
 // Store %rax to an address that the stack top is pointing to.
@@ -85,9 +95,9 @@ static void store(Type *type) {
   pop("%rdi");
 
   if (type->size == 1)
-    printf("\tmov %%al, (%%rdi)\n");
+    emitln("\tmov %%al, (%%rdi)");
   else
-    printf("\tmov %%rax, (%%rdi)\n");
+    emitln("\tmov %%rax, (%%rdi)");
 }
 
 static void gen_expr(Node *node) {
@@ -98,7 +108,7 @@ static void gen_expr(Node *node) {
     switch (unary->kind) {
     case NODE_NEG:
       gen_expr(unary->expr);
-      printf("\tneg %%rax\n");
+      emitln("\tneg %%rax");
       return;
     case NODE_ADDR:
       gen_addr(unary->expr);
@@ -137,34 +147,34 @@ static void gen_expr(Node *node) {
 
     switch (binary->kind) {
     case NODE_ADD:
-      printf("\tadd %%rdi, %%rax\n");
+      emitln("\tadd %%rdi, %%rax");
       return;
     case NODE_SUB:
-      printf("\tsub %%rdi, %%rax\n");
+      emitln("\tsub %%rdi, %%rax");
       return;
     case NODE_MUL:
-      printf("\timul %%rdi, %%rax\n");
+      emitln("\timul %%rdi, %%rax");
       return;
     case NODE_DIV:
-      printf("\tcqo\n");
-      printf("\tidiv %%rdi\n");
+      emitln("\tcqo\n");
+      emitln("\tidiv %%rdi");
       return;
     case NODE_EQ:
     case NODE_NE:
     case NODE_LT:
     case NODE_LE:
-      printf("\tcmp %%rdi, %%rax\n");
+      emitln("\tcmp %%rdi, %%rax");
 
       if (binary->kind == NODE_EQ)
-        printf("\tsete %%al\n");
+        emitln("\tsete %%al");
       else if (binary->kind == NODE_NE)
-        printf("\tsetne %%al\n");
+        emitln("\tsetne %%al");
       else if (binary->kind == NODE_LT)
-        printf("\tsetl %%al\n");
+        emitln("\tsetl %%al");
       else if (binary->kind == NODE_LE)
-        printf("\tsetle %%al\n");
+        emitln("\tsetle %%al");
 
-      printf("\tmovzb %%al, %%rax\n");
+      emitln("\tmovzb %%al, %%rax");
       return;
     default:
       break;
@@ -183,8 +193,8 @@ static void gen_expr(Node *node) {
     for (int i = nargs - 1; i >= 0; i--)
       pop(argreg64[i]);
 
-    printf("\tmov $0, %%rax\n");
-    printf("\tcall %s\n", fun_call->funcname);
+    emitln("\tmov $0, %%rax");
+    emitln("\tcall %s", fun_call->funcname);
     return;
   }
   case NODE_TAG_VAR: {
@@ -194,7 +204,7 @@ static void gen_expr(Node *node) {
     return;
   }
   case NODE_TAG_NUM:
-    printf("\tmov $%d, %%rax\n", ((struct NumNode *)node)->val);
+    emitln("\tmov $%d, %%rax", ((struct NumNode *)node)->val);
     return;
   default:
     break;
@@ -213,7 +223,7 @@ static void gen_stmt(Node *node) {
       return;
     case NODE_RETURN:
       gen_expr(unary->expr);
-      printf("\tjmp .L.return.%s\n", current_fn->name);
+      emitln("\tjmp .L.return.%s", current_fn->name);
       return;
     default:
       break;
@@ -224,15 +234,15 @@ static void gen_stmt(Node *node) {
     struct IfNode *if_node = (struct IfNode *)node;
     const int c = count();
     gen_expr(if_node->cond_expr);
-    printf("\tcmp $0, %%rax\n");
-    printf("\tje  .L.else.%d\n", c);
+    emitln("\tcmp $0, %%rax");
+    emitln("\tje  .L.else.%d", c);
     gen_stmt(if_node->then_stmt);
-    printf("\tjmp .L.end.%d\n", c);
-    printf(".L.else.%d:\n", c);
+    emitln("\tjmp .L.end.%d", c);
+    emitln(".L.else.%d:", c);
     if (if_node->else_stmt) {
       gen_stmt(if_node->else_stmt);
     }
-    printf(".L.end.%d:\n", c);
+    emitln(".L.end.%d:", c);
     return;
   }
   case NODE_TAG_FOR: {
@@ -240,17 +250,17 @@ static void gen_stmt(Node *node) {
     int c = count();
     if (for_node->init_expr)
       gen_stmt(for_node->init_expr);
-    printf(".L.begin.%d:\n", c);
+    emitln(".L.begin.%d:", c);
     if (for_node->cond_expr) {
       gen_expr(for_node->cond_expr);
-      printf("\tcmp $0, %%rax\n");
-      printf("\tje  .L.end.%d\n", c);
+      emitln("\tcmp $0, %%rax");
+      emitln("\tje  .L.end.%d", c);
     }
     gen_stmt(for_node->body_stmt);
     if (for_node->inc_expr)
       gen_expr(for_node->inc_expr);
-    printf("\tjmp .L.begin.%d\n", c);
-    printf(".L.end.%d:\n", c);
+    emitln("\tjmp .L.begin.%d", c);
+    emitln(".L.end.%d:", c);
     return;
   }
   case NODE_TAG_BLOCK: {
@@ -287,15 +297,15 @@ static void emit_data(Obj *prog) {
     if (var->is_function)
       continue;
 
-    printf(".data\n");
-    printf(".globl %s\n", var->name);
-    printf("%s:\n", var->name);
+    emitln(".data");
+    emitln(".globl %s", var->name);
+    emitln("%s:", var->name);
     if (var->init_data) {
       for (int i = 0; i < var->type->size; i++) {
-        printf("\t.byte %d\n", var->init_data[i]);
+        emitln("\t.byte %d", var->init_data[i]);
       }
     } else {
-      printf("\t.zero %d\n", var->type->size);
+      emitln("\t.zero %d", var->type->size);
     }
   }
 }
@@ -305,26 +315,26 @@ static void emit_text(Obj *prog) {
     if (!fn->is_function)
       continue;
 
-    printf(".text\n");
-    printf(".globl %s\n", fn->name);
-    printf("%s:\n", fn->name);
+    emitln(".text");
+    emitln(".globl %s", fn->name);
+    emitln("%s:", fn->name);
     current_fn = fn;
 
     // Prologue
     if (fn->stack_size != 0) {
-      printf("\tpush %%rbp\n");
-      printf("\tmov %%rsp, %%rbp\n");
+      emitln("\tpush %%rbp");
+      emitln("\tmov %%rsp, %%rbp");
 
-      printf("\tsub $%d, %%rsp\n", fn->stack_size);
+      emitln("\tsub $%d, %%rsp", fn->stack_size);
     }
 
     // Save passed-by-register arguments to the stack
     int i = 0;
     for (Obj *var = fn->params; var; var = var->next) {
       if (var->type->size == 1)
-        printf("\tmov %s, %d(%%rbp)\n", argreg8[i++], var->offset);
+        emitln("\tmov %s, %d(%%rbp)", argreg8[i++], var->offset);
       else
-        printf("\tmov %s, %d(%%rbp)\n", argreg64[i++], var->offset);
+        emitln("\tmov %s, %d(%%rbp)", argreg64[i++], var->offset);
     }
 
     // Emit code
@@ -332,16 +342,17 @@ static void emit_text(Obj *prog) {
     assert(depth == 0);
 
     // Epilogue
-    printf(".L.return.%s:\n", fn->name);
+    emitln(".L.return.%s:", fn->name);
     if (fn->stack_size != 0) {
-      printf("\tmov %%rbp, %%rsp\n");
-      printf("\tpop %%rbp\n");
+      emitln("\tmov %%rbp, %%rsp");
+      emitln("\tpop %%rbp");
     }
-    printf("\tret\n");
+    emitln("\tret");
   }
 }
 
-void codegen(Obj *prog) {
+void codegen(Obj *prog ,FILE* out) {
+  output_file = out;
   assign_lvar_offsets(prog);
   emit_data(prog);
   emit_text(prog);
