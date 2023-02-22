@@ -1,3 +1,4 @@
+#include "ast_node.h"
 #include "cimple.h"
 
 // All local variable instances created during parsing are
@@ -7,8 +8,8 @@ static Obj *globals;
 
 static Type *declspec(const Token **rest, const Token *tok);
 static Type *declarator(const Token **rest, const Token *tok, Type *type);
-static Node *declaration(const Token **rest, const Token *tok);
-static Node *compound_stmt(const Token **rest, const Token *tok);
+static struct BlockNode *declaration(const Token **rest, const Token *tok);
+static struct BlockNode *compound_stmt(const Token **rest, const Token *tok);
 static Node *stmt(const Token **rest, const Token *tok);
 static Node *expr_stmt(const Token **rest, const Token *tok);
 static Node *expr(const Token **rest, const Token *tok);
@@ -59,7 +60,7 @@ static Obj *new_gvar(Type *type, const char *name, int name_len) {
 
 static char *new_unique_name() {
   static int id = 0;
-  return format(".L..%d",id++);
+  return format(".L..%d", id++);
 }
 
 static Obj *new_anon_gvar(Type *type) {
@@ -153,7 +154,7 @@ static Type *declarator(const Token **rest, const Token *tok, Type *type) {
 
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
 // expr)?)*)? ";"
-static Node *declaration(const Token **rest, const Token *tok) {
+static struct BlockNode *declaration(const Token **rest, const Token *tok) {
   Type *base_type = declspec(&tok, tok);
 
   Node head = {0};
@@ -176,7 +177,7 @@ static Node *declaration(const Token **rest, const Token *tok) {
     cur = cur->next = new_unary_node(NODE_EXPR_STMT, node, tok);
   }
 
-  Node *node = new_block_node(head.next, tok);
+  struct BlockNode *node = new_block_node(head.next, tok);
   *rest = tok->next;
   return node;
 }
@@ -256,26 +257,26 @@ static Node *stmt(const Token **rest, const Token *tok) {
   }
 
   if (equal(tok, "{")) {
-    return compound_stmt(rest, tok->next);
+    return (Node *)compound_stmt(rest, tok->next);
   }
 
   return expr_stmt(rest, tok);
 }
 
 // compound-stmt = (declaration | stmt)* "}"
-static Node *compound_stmt(const Token **rest, const Token *tok) {
+static struct BlockNode *compound_stmt(const Token **rest, const Token *tok) {
   Node head = {0};
   Node *cur = &head;
   while (!equal(tok, "}")) {
     if (is_typename(tok)) {
-      cur = cur->next = declaration(&tok, tok);
+      cur = cur->next = (Node *)declaration(&tok, tok);
     } else {
       cur = cur->next = stmt(&tok, tok);
     }
     add_type(cur);
   }
 
-  Node *node = new_block_node(head.next, tok);
+  struct BlockNode *node = new_block_node(head.next, tok);
   *rest = tok->next;
   return node;
 }
@@ -285,7 +286,7 @@ static Node *expr_stmt(const Token **rest, const Token *tok) {
   if (equal(tok, ";")) {
     // empty expression
     *rest = tok->next;
-    return new_block_node(NULL, tok);
+    return (Node *)new_block_node(NULL, tok);
   }
   const Token *start = tok;
 
@@ -522,8 +523,22 @@ static Node *funcall(const Token **rest, const Token *tok) {
   return node;
 }
 
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
+// primary = "(" "{" stmt+ "}" ")"
+//         | "(" expr ")"
+//         | "sizeof" unary
+//         | ident func-args?
+//         | str
+//         | num
 static Node *primary(const Token **rest, const Token *tok) {
+  if (equal(tok, "(") && equal(tok->next, "{")) {
+    // This is a GNU statement expresssion.
+    const Token *start = tok;
+
+    struct BlockNode *block_node = compound_stmt(&tok, tok->next->next);
+    *rest = consume(tok, ")");
+    return new_unary_node(NODE_STMT_EXPR, block_node->body, start);
+    ;
+  }
   if (equal(tok, "(")) {
     Node *node = expr(&tok, tok->next);
     *rest = consume(tok, ")");
@@ -584,7 +599,7 @@ static const Token *function(const Token *tok, Type *base_type) {
   fn->params = locals;
 
   tok = consume(tok, "{");
-  fn->body = compound_stmt(&tok, tok);
+  fn->body = (Node*)compound_stmt(&tok, tok);
   fn->locals = locals;
   return tok;
 }

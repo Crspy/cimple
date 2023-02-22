@@ -1,3 +1,4 @@
+#include "ast_node.h"
 #include "cimple.h"
 
 static int depth;
@@ -6,6 +7,7 @@ static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
 
 static void gen_expr(Node *node);
+static void gen_stmt(Node *node);
 
 static int count(void) {
   static int i = 1;
@@ -104,6 +106,12 @@ static void gen_expr(Node *node) {
     case NODE_DEREF:
       gen_expr(unary->expr);
       load(node->type);
+      return;
+    case NODE_STMT_EXPR:
+      for (Node *n = unary->expr; n; n = n->next)
+      {
+        gen_stmt(n);
+      }
       return;
     default:
       break;

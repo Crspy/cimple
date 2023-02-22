@@ -1,23 +1,25 @@
+#include "ast_node.h"
 #include "cimple.h"
 
 /*static Type type_int = {.kind = TYPE_INT, .size = 8};*/
 
-
-Type *char_type() { 
-  Type *type = calloc(1, sizeof(Type)); 
+Type *char_type() {
+  Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_CHAR;
   type->size = 1;
   return type;
 }
 
-Type *int_type() { 
-  Type *type = calloc(1, sizeof(Type)); 
+Type *int_type() {
+  Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_INT;
   type->size = 8;
   return type;
 }
 
-bool is_integer(Type *type) { return type->kind == TYPE_INT || type->kind == TYPE_CHAR; }
+bool is_integer(Type *type) {
+  return type->kind == TYPE_INT || type->kind == TYPE_CHAR;
+}
 
 Type *copy_type(Type *type) {
   Type *ret = malloc(sizeof(Type));
@@ -80,6 +82,23 @@ void add_type(struct Node *node) {
       }
       node->type = unary->expr->type->base;
       return;
+    case NODE_STMT_EXPR: {
+      if (unary->expr) {
+        Node *stmt = unary->expr;
+        while (stmt->next)
+          stmt = stmt->next;
+        if (stmt->tag == NODE_TAG_UNARY) {
+          struct UnaryNode *last_node = (struct UnaryNode *)stmt;
+          if (last_node->kind == NODE_EXPR_STMT) {
+            node->type = last_node->expr->type;
+            return;
+          }
+        }
+      }
+      error_tok(node->tok,
+                "statement expression returning void is not supported");
+      return;
+    }
     default:
       break;
     }

@@ -40,12 +40,12 @@ Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
   node->body_stmt = body_stmt;
   return (Node *)node;
 }
-Node *new_block_node(Node *body, const Token *tok) {
+struct BlockNode *new_block_node(Node *body, const Token *tok) {
   struct BlockNode *node = calloc(1, sizeof(struct BlockNode));
   node->node.tag = NODE_TAG_BLOCK;
   node->node.tok = tok;
   node->body = body;
-  return (Node *)node;
+  return node;
 }
 Node *new_fun_call_node(const char *funcname, int funcname_len,
                                Node *args, const Token *tok) {

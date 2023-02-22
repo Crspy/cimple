@@ -1,5 +1,6 @@
 #ifndef TOKENIZER_HEADER_GUARD
 #define TOKENIZER_HEADER_GUARD
+#include "stdbool.h"
 
 typedef enum {
   TOKEN_IDENT,   // Identifiers

@@ -28,6 +28,7 @@ typedef enum {
   NODE_ADDR,      // unary &
   NODE_DEREF,     // unary *
   NODE_EXPR_STMT, // Expression statement
+  NODE_STMT_EXPR, // Statement expression
   NODE_RETURN,    // "return"
 } UnaryKind;
 struct UnaryNode {
@@ -91,7 +92,7 @@ Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
                   const Token *tok);
 Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
                    Node *body_stmt, const Token *tok);
-Node *new_block_node(Node *body, const Token *tok);
+struct BlockNode *new_block_node(Node *body, const Token *tok);
 Node *new_fun_call_node(const char *funcname, int funcname_len, Node *args,
                         const Token *tok);
 Node *new_var_node(struct Obj *var, const Token *tok);
