@@ -99,8 +99,23 @@ static bool is_keyword(Token *tok) {
   return false;
 }
 
-static int read_escaped_char(const char ch) {
-  switch (ch) {
+static int read_escaped_char(const char **new_pos,const char *p) {
+  if ('0' <= *p && *p <= '7') {
+    // Read an octal number (only 3 digits)
+    int c = *p++ - '0';
+    if ('0' <= *p && *p <= '7') {
+      c = (c << 3) + (*p++ - '0');
+      if ('0' <= *p && *p <= '7')
+        c = (c << 3) + (*p++ - '0');
+    }
+    *new_pos = p;
+    return c;
+  }
+
+  *new_pos = p + 1;
+
+  // Escape sequences are defined using themselves
+  switch (*p) {
   case 'a':
     return '\a';
   case 'b':
@@ -119,7 +134,7 @@ static int read_escaped_char(const char ch) {
   case 'e':
     return 27;
   default:
-    return ch;
+    return *p;
   }
 }
 
@@ -142,8 +157,7 @@ static Token *read_string_literal(const char *start) {
 
   for (const char *p = start + 1; p < end;) {
     if (*p == '\\') {
-      buf[len++] = read_escaped_char(*(p + 1));
-      p += 2;
+      buf[len++] = read_escaped_char(&p,p + 1);
     } else {
       buf[len++] = *p++;
     }
