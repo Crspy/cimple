@@ -98,8 +98,16 @@ static bool is_keyword(Token *tok) {
       return true;
   return false;
 }
+static int from_hex(char c) {
+  if ('0' <= c && c <= '9')
+    return c - '0';
 
-static int read_escaped_char(const char **new_pos,const char *p) {
+  if ('a' <= c && c <= 'f')
+    return c - 'a' + 10;
+
+  return c - 'A' + 10;
+}
+static int read_escaped_char(const char **new_pos, const char *p) {
   if ('0' <= *p && *p <= '7') {
     // Read an octal number (only 3 digits)
     int c = *p++ - '0';
@@ -109,6 +117,23 @@ static int read_escaped_char(const char **new_pos,const char *p) {
         c = (c << 3) + (*p++ - '0');
     }
     *new_pos = p;
+
+    // TODO: check if octal escape sequence out of range
+    return c;
+  }
+
+  if (*p == 'x') {
+    // Read a hexadecimal number.
+    p++;
+    if (!isxdigit(*p))
+      error_at(p, "invalid hex escape sequence");
+
+    int c = 0;
+    for (; isxdigit(*p); p++)
+      c = (c << 4) + from_hex(*p);
+    *new_pos = p;
+
+    // TODO: check if hex escape sequence out of range
     return c;
   }
 
@@ -157,7 +182,7 @@ static Token *read_string_literal(const char *start) {
 
   for (const char *p = start + 1; p < end;) {
     if (*p == '\\') {
-      buf[len++] = read_escaped_char(&p,p + 1);
+      buf[len++] = read_escaped_char(&p, p + 1);
     } else {
       buf[len++] = *p++;
     }
