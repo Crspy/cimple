@@ -25,6 +25,6 @@ Obj *parse(const Token *tok);
 // codegen.c
 //
 
-void codegen(Obj *prog);
+void codegen(Obj *prog,FILE* out);
 
 #endif /* CIMPLE_HEADER_GUARD */

@@ -7,6 +7,7 @@ all: cimple
 
 test:
 	./test.sh
+	./test-driver.sh
 
 %.o : %.c Makefile
 	$(CC) $(CFLAGS) $(INCS) -c $< -o $@
