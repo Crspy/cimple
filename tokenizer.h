@@ -29,6 +29,6 @@ void error_tok(const Token *tok, const char *fmt, ...);
 bool equal(const Token *tok, const char *op);
 Token *consume(const Token *tok, const char *op);
 bool match(const Token **rest, const Token *tok, const char *str);
-Token *tokenize(const char *input);
+Token *tokenize_file(const char *filename);
 
 #endif /* TOKENIZER_HEADER_GUARD */
