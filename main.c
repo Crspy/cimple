@@ -46,10 +46,13 @@ static FILE *open_file(char *path) {
   return out;
 }
 
+<<<<<<< HEAD
 static void close_file(FILE *file) {
   if (file != stdout)
     fclose(file);
 }
+=======
+>>>>>>> c171847a04114f9433fe2a71dcb0c7e553d9499e
 
 int main(int argc, char **argv) {
   parse_args(argc, argv);
@@ -61,6 +64,9 @@ int main(int argc, char **argv) {
   // Traverse the AST to emit assembly.
   FILE *out = open_file(opt_o);
   codegen(prog, out);
+<<<<<<< HEAD
   close_file(out);
+=======
+>>>>>>> c171847a04114f9433fe2a71dcb0c7e553d9499e
   return 0;
 }
