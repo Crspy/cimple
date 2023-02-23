@@ -326,7 +326,7 @@ static const char *string_literal_end(const char *p) {
   const char *start = p;
   for (; *p != '"'; p++) {
     if (*p == '\n' || *p == '\0')
-      error_at(start, "unclosed string literal");
+      error_at(start, "unterminated string literal");
     if (*p == '\\')
       p++;
   }
@@ -361,6 +361,23 @@ static Token *tokenize(const char *filename, const char *p) {
   Token *cur = &head;
 
   while (*p) {
+    // Skip line comments.
+    if (startswith(p, "//")) {
+      p += 2;
+      while (*p != '\n')
+        p++;
+      continue;
+    }
+
+    // Skip block comments.
+    if (startswith(p, "/*")) {
+      char *q = strstr(p + 2, "*/");
+      if (!q)
+        error_at(p, "unterminated block comment");
+      p = q + 2;
+      continue;
+    }
+
     // Skip whitespace characters.
     if (isspace(*p)) {
       p++;
@@ -391,7 +408,6 @@ static Token *tokenize(const char *filename, const char *p) {
       } while (is_ident2(*p));
       cur = cur->next = new_token(TOKEN_IDENT, start, p);
 
-      
       TokenKind keywordKind;
       if (find_keyword(cur, &keywordKind)) {
         cur->kind = keywordKind;
