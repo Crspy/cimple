@@ -129,6 +129,9 @@ void add_type(struct Node *node) {
       }
       node->type = binary->lhs->type;
       return;
+    case NODE_COMMA:
+      node->type = binary->rhs->type;
+      return;
     }
     break;
   }

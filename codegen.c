@@ -16,7 +16,7 @@ static void emitln(const char *fmt, ...) {
   va_start(ap, fmt);
   vfprintf(output_file, fmt, ap);
   va_end(ap);
-  fputc('\n',output_file );
+  fputc('\n', output_file);
 }
 
 static int count(void) {
@@ -62,8 +62,18 @@ static void gen_addr(Node *node) {
     struct UnaryNode *unary = (struct UnaryNode *)node;
     if (unary->kind == NODE_DEREF) {
       gen_expr(unary->expr);
+      return;
     }
-    return;
+    break;
+  }
+  case NODE_TAG_BINARY: {
+    struct BinaryNode *binary = (struct BinaryNode *)node;
+    if (binary->kind == NODE_COMMA) {
+      gen_expr(binary->lhs);
+      gen_addr(binary->rhs);
+      return;
+    }
+    break;
   }
   default:
     break;
@@ -101,7 +111,7 @@ static void store(Type *type) {
 }
 
 static void gen_expr(Node *node) {
-  emitln("\t.loc 1 %lu %lu",node->tok->line_no,node->tok->col_pos);
+  emitln("\t.loc 1 %lu %lu", node->tok->line_no, node->tok->col_pos);
 
   switch (node->tag) {
   case NODE_TAG_UNARY: {
@@ -120,8 +130,7 @@ static void gen_expr(Node *node) {
       load(node->type);
       return;
     case NODE_STMT_EXPR:
-      for (Node *n = unary->expr; n; n = n->next)
-      {
+      for (Node *n = unary->expr; n; n = n->next) {
         gen_stmt(n);
       }
       return;
@@ -139,6 +148,10 @@ static void gen_expr(Node *node) {
       push(); // push the address of the local variable
       gen_expr(binary->rhs);
       store(node->type);
+      return;
+    } else if (binary->kind == NODE_COMMA) {
+      gen_expr(binary->lhs);
+      gen_expr(binary->rhs);
       return;
     }
 
@@ -216,8 +229,8 @@ static void gen_expr(Node *node) {
 }
 
 static void gen_stmt(Node *node) {
-  emitln("\t.loc 1 %lu %lu",node->tok->line_no,node->tok->col_pos);
-  
+  emitln("\t.loc 1 %lu %lu", node->tok->line_no, node->tok->col_pos);
+
   switch (node->tag) {
   case NODE_TAG_UNARY: {
     struct UnaryNode *unary = (struct UnaryNode *)node;
@@ -355,7 +368,7 @@ static void emit_text(Obj *prog) {
   }
 }
 
-void codegen(Obj *prog ,FILE* out) {
+void codegen(Obj *prog, FILE *out) {
   output_file = out;
   assign_lvar_offsets(prog);
   emit_data(prog);

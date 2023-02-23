@@ -1,5 +1,6 @@
 #include "ast_node.h"
 #include "cimple.h"
+#include "tokenizer.h"
 
 // Scope for local or global variables.
 typedef struct VarScope VarScope;
@@ -348,9 +349,15 @@ static Node *expr_stmt(const Token **rest, const Token *tok) {
   return node;
 }
 
-// expr = assign
+// expr = assign ("," expr)?
 static Node *expr(const Token **rest, const Token *tok) {
-  return assign(rest, tok);
+  Node *node = assign(&tok, tok);
+
+  if (check(tok, TOKEN_COMMA))
+    return new_binary_node(NODE_COMMA, node, expr(rest, tok->next), tok);
+
+  *rest = tok;
+  return node;
 }
 
 // assign = equality ("=" assign)?

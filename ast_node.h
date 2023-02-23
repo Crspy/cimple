@@ -47,6 +47,7 @@ typedef enum {
   NODE_LT,     // <
   NODE_LE,     // <=
   NODE_ASSIGN, // =
+  NODE_COMMA,  // ,
 } BinaryKind;
 typedef struct BinaryNode {
   Node node;
