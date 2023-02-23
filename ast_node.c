@@ -57,7 +57,7 @@ Node *new_fun_call_node(const char *funcname, int funcname_len,
   node->args = args;
   return (Node *)node;
 }
-Node *new_var_node(Obj *var, const Token *tok) {
+Node *new_var_node(const Obj *var, const Token *tok) {
   struct VarNode *node = calloc(1, sizeof(struct VarNode));
   node->node.tag = NODE_TAG_VAR;
   node->node.tok = tok;

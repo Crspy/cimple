@@ -79,7 +79,7 @@ typedef struct FunCallNode {
 } FunCallNode;
 typedef struct VarNode {
   Node node;
-  struct Obj *var;
+  const struct Obj *var;
 } VarNode;
 typedef struct NumNode {
   Node node;
@@ -95,7 +95,7 @@ Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
 BlockNode *new_block_node(Node *body, const Token *tok);
 Node *new_fun_call_node(const char *funcname, int funcname_len, Node *args,
                         const Token *tok);
-Node *new_var_node(struct Obj *var, const Token *tok);
+Node *new_var_node(const struct Obj *var, const Token *tok);
 Node *new_num_node(int val, const Token *tok);
 
 #endif /* AST_NODE_HEADER_GUARD */

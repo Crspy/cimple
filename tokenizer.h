@@ -74,5 +74,6 @@ Token *consume(const Token *tok, TokenKind kind);
 bool check(const Token *tok, TokenKind kind);
 bool match(const Token **rest, const Token *tok, TokenKind kind);
 Token *tokenize_file(const char *filename);
+void free_tokens(Token *tok);
 
 #endif /* TOKENIZER_HEADER_GUARD */

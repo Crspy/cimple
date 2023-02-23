@@ -109,12 +109,14 @@ void error_tok(const Token *tok, const char *fmt, ...) {
   verror_at(tok->loc, fmt, ap);
 }
 
-// Consumes the current token if it matches `op`.
+// Ensure that the current token is `op`.
 bool equal(const Token *tok, const char *op) {
-  return memcmp(tok->loc, op, tok->len) == 0 && op[tok->len] == '\0';
+  const int op_len = strlen(op);
+  const int min_len = op_len < tok->len ? op_len : tok->len;
+  return memcmp(tok->loc, op, min_len) == 0 && op[min_len] == '\0';
 }
 
-// Ensure that the current token is `op`.
+// Consumes the current token if it matches `op`.
 Token *consume(const Token *tok, TokenKind kind) {
   if (!check(tok, kind))
     error_tok(tok, "expected '%s'", token_to_str(kind));
@@ -484,4 +486,12 @@ static char *read_file(const char *path) {
 
 Token *tokenize_file(const char *path) {
   return tokenize(path, read_file(path));
+}
+
+void free_tokens(Token *tok) {
+  while (tok) {
+    Token *dead_tok = tok;
+    tok = tok->next;
+    free(dead_tok);
+  }
 }

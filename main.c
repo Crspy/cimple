@@ -64,5 +64,6 @@ int main(int argc, char **argv) {
   codegen(prog, out);
 
   close_file(out);
+  //free_tokens(tok); // the process will exit anyway (after this point)
   return 0;
 }
