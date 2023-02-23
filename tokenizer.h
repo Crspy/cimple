@@ -66,6 +66,7 @@ struct Token {
   char *str;         // String literal contents including terminating '\0'
 
   size_t line_no; // Line number
+  size_t col_pos;  // distance from start of line
 };
 
 const char *token_to_str(TokenKind c);

@@ -101,6 +101,8 @@ static void store(Type *type) {
 }
 
 static void gen_expr(Node *node) {
+  emitln("\t.loc 1 %lu %lu",node->tok->line_no,node->tok->col_pos);
+
   switch (node->tag) {
   case NODE_TAG_UNARY: {
     struct UnaryNode *unary = (struct UnaryNode *)node;
@@ -214,6 +216,8 @@ static void gen_expr(Node *node) {
 }
 
 static void gen_stmt(Node *node) {
+  emitln("\t.loc 1 %lu %lu",node->tok->line_no,node->tok->col_pos);
+  
   switch (node->tag) {
   case NODE_TAG_UNARY: {
     struct UnaryNode *unary = (struct UnaryNode *)node;

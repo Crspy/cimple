@@ -46,7 +46,6 @@ static FILE *open_file(char *path) {
   return out;
 }
 
-
 static void close_file(FILE *file) {
   if (file != stdout)
     fclose(file);
@@ -61,9 +60,10 @@ int main(int argc, char **argv) {
 
   // Traverse the AST to emit assembly.
   FILE *out = open_file(opt_o);
+  fprintf(out, ".file 1 \"%s\"\n", input_path);
   codegen(prog, out);
 
   close_file(out);
-  //free_tokens(tok); // the process will exit anyway (after this point)
+  // free_tokens(tok); // the process will exit anyway (after this point)
   return 0;
 }
