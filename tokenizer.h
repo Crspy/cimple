@@ -1,5 +1,6 @@
 #ifndef TOKENIZER_HEADER_GUARD
 #define TOKENIZER_HEADER_GUARD
+#include "stddef.h"
 #include "stdbool.h"
 
 typedef enum {
@@ -63,6 +64,8 @@ struct Token {
   int len;           // Token length
   struct Type *type; // Used if TOKENK_STR
   char *str;         // String literal contents including terminating '\0'
+
+  size_t line_no; // Line number
 };
 
 const char *token_to_str(TokenKind c);
