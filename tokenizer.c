@@ -1,3 +1,4 @@
+#include "tokenizer.h"
 #include "cimple.h"
 
 // Input filename
@@ -5,6 +6,54 @@ static const char *current_filename;
 
 // Input string
 static const char *current_input;
+
+static const char *tokens_strings[TOKEN_TOTAL_COUNT] = {
+    [TOKEN_RETURN] = "return",
+    [TOKEN_IF] = "if",
+    [TOKEN_ELSE] = "else",
+    [TOKEN_FOR] = "for",
+    [TOKEN_WHILE] = "while",
+    [TOKEN_INT] = "int",
+    [TOKEN_CHAR] = "char",
+    [TOKEN_SIZEOF] = "sizeof",
+    [TOKEN_KEYWORDS_COUNT] = "8",
+    [TOKEN_LEFT_BRACKET] = "[",
+    [TOKEN_RIGHT_BRACKET] = "]",
+    [TOKEN_LEFT_PAREN] = "(",
+    [TOKEN_RIGHT_PAREN] = ")",
+    [TOKEN_LEFT_BRACE] = "{",
+    [TOKEN_RIGHT_BRACE] = "}",
+    [TOKEN_COMMA] = ",",
+    [TOKEN_DOT] = ".",
+    [TOKEN_MINUS] = "-",
+    [TOKEN_PLUS] = "+",
+    [TOKEN_SEMICOLON] = ",",
+    [TOKEN_SLASH] = "/",
+    [TOKEN_STAR] = "*",
+    [TOKEN_PERCENT] = "%",
+    [TOKEN_COLON] = ":",
+    [TOKEN_AMPERSAND] = "&",
+    [TOKEN_BANG] = "!",
+    [TOKEN_BANG_EQUAL] = "!=",
+    [TOKEN_EQUAL] = "=",
+    [TOKEN_EQUAL_EQUAL] = "==",
+    [TOKEN_GREATER] = ">",
+    [TOKEN_GREATER_EQUAL] = ">=",
+    [TOKEN_LESS] = "<",
+    [TOKEN_LESS_EQUAL] = "<=",
+    [TOKEN_PLUS_PLUS] = "++",
+    [TOKEN_MINUS_MINUS] = "--",
+    [TOKEN_IDENT] = "identifier",
+    [TOKEN_STR] = "string literal",
+    [TOKEN_NUM] = "numeric literal",
+    [TOKEN_EOF] = "eof",
+};
+
+const char *token_to_str(TokenKind c) {
+  if (TOKEN_TOTAL_COUNT > c)
+    return tokens_strings[c];
+  return "unknown-token";
+}
 
 // Reports an error and exit.
 void error(const char *fmt, ...) {
@@ -19,7 +68,7 @@ void error(const char *fmt, ...) {
 //
 // foo.c:10: x = y + 1;
 //               ^ <error message here>
-static void verror_at(const char *loc,const char *fmt, va_list ap) {
+static void verror_at(const char *loc, const char *fmt, va_list ap) {
   // Find a line containing `loc`.
   const char *line = loc;
   while (current_input < line && line[-1] != '\n')
@@ -66,16 +115,19 @@ bool equal(const Token *tok, const char *op) {
 }
 
 // Ensure that the current token is `op`.
-Token *consume(const Token *tok, const char *op) {
-  if (!equal(tok, op))
-    error_tok(tok, "expected '%s'", op);
+Token *consume(const Token *tok, TokenKind kind) {
+  if (!check(tok, kind))
+    error_tok(tok, "expected '%s'", token_to_str(kind));
   return tok->next;
 }
 
-// tries to consume the current token if it is equal to `str` and returns true
+// Ensure that the current token kind is 'kind'
+bool check(const Token *tok, TokenKind kind) { return tok->kind == kind; }
+
+// tries to consume the current token if it has the same `kind` and returns true
 // otherwise returns false
-bool match(const Token **rest, const Token *tok, const char *str) {
-  if (equal(tok, str)) {
+bool match(const Token **rest, const Token *tok, TokenKind kind) {
+  if (check(tok, kind)) {
     *rest = tok->next;
     return true;
   }
@@ -106,21 +158,102 @@ static bool is_ident1(char c) {
 static bool is_ident2(char c) { return is_ident1(c) || ('0' <= c && c <= '9'); }
 
 // Read a punctuator token from p and returns its length.
-static int read_punct(const char *p) {
-  if (startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") ||
-      startswith(p, ">="))
-    return 2;
-
-  return ispunct(*p) ? 1 : 0;
+static int read_punct(const char *p, TokenKind *kind) {
+  switch (*p) {
+  case '[':
+    *kind = TOKEN_LEFT_BRACKET;
+    return 1;
+  case ']':
+    *kind = TOKEN_RIGHT_BRACKET;
+    return 1;
+  case '(':
+    *kind = TOKEN_LEFT_PAREN;
+    return 1;
+  case ')':
+    *kind = TOKEN_RIGHT_PAREN;
+    return 1;
+  case '{':
+    *kind = TOKEN_LEFT_BRACE;
+    return 1;
+  case '}':
+    *kind = TOKEN_RIGHT_BRACE;
+    return 1;
+  case ';':
+    *kind = TOKEN_SEMICOLON;
+    return 1;
+  case ',':
+    *kind = TOKEN_COMMA;
+    return 1;
+  case '.':
+    *kind = TOKEN_DOT;
+    return 1;
+  case '-':
+    if (p[1] == '-') {
+      *kind = TOKEN_MINUS_MINUS;
+      return 2;
+    }
+    *kind = TOKEN_MINUS;
+    return 1;
+  case '+':
+    if (p[1] == '+') {
+      *kind = TOKEN_PLUS_PLUS;
+      return 2;
+    }
+    *kind = TOKEN_PLUS;
+    return 1;
+  case '/':
+    *kind = TOKEN_SLASH;
+    return 1;
+  case '*':
+    *kind = TOKEN_STAR;
+    return 1;
+  case '&':
+    *kind = TOKEN_AMPERSAND;
+    return 1;
+  case '%':
+    *kind = TOKEN_PERCENT;
+    return 1;
+  case ':':
+    *kind = TOKEN_COLON;
+    return 1;
+  case '!':
+    if (p[1] == '=') {
+      *kind = TOKEN_BANG_EQUAL;
+      return 2;
+    }
+    *kind = TOKEN_BANG;
+    return 1;
+  case '=':
+    if (p[1] == '=') {
+      *kind = TOKEN_EQUAL_EQUAL;
+      return 2;
+    }
+    *kind = TOKEN_EQUAL;
+    return 1;
+  case '<':
+    if (p[1] == '=') {
+      *kind = TOKEN_LESS_EQUAL;
+      return 2;
+    }
+    *kind = TOKEN_LESS;
+    return 1;
+  case '>':
+    if (p[1] == '=') {
+      *kind = TOKEN_GREATER_EQUAL;
+      return 2;
+    }
+    *kind = TOKEN_GREATER;
+    return 1;
+  }
+  return 0;
 }
 
-static bool is_keyword(Token *tok) {
-  static char *kw[] = {"return", "if",  "else", "for",
-                       "while",  "int", "char", "sizeof"};
-
-  for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
-    if (equal(tok, kw[i]))
+static bool find_keyword(Token *tok, TokenKind *kind) {
+  for (int i = 0; i < TOKEN_KEYWORDS_COUNT; i++)
+    if (equal(tok, tokens_strings[i])) {
+      *kind = i;
       return true;
+    }
   return false;
 }
 static int from_hex(char c) {
@@ -220,14 +353,6 @@ static Token *read_string_literal(const char *start) {
   return tok;
 }
 
-static void convert_keywords(Token *tok) {
-  for (Token *t = tok; t->kind != TOKEN_EOF; t = t->next) {
-    if (is_keyword(t)) {
-      t->kind = TOKEN_KEYWORD;
-    }
-  }
-}
-
 // Tokenize `current_input` and returns new tokens.
 static Token *tokenize(const char *filename, const char *p) {
   current_filename = filename;
@@ -265,13 +390,20 @@ static Token *tokenize(const char *filename, const char *p) {
         p++;
       } while (is_ident2(*p));
       cur = cur->next = new_token(TOKEN_IDENT, start, p);
+
+      
+      TokenKind keywordKind;
+      if (find_keyword(cur, &keywordKind)) {
+        cur->kind = keywordKind;
+      }
       continue;
     }
 
     // Punctuators
-    int punct_len = read_punct(p);
+    TokenKind punct_kind;
+    int punct_len = read_punct(p, &punct_kind);
     if (punct_len) {
-      cur = cur->next = new_token(TOKEN_PUNCT, p, p + punct_len);
+      cur = cur->next = new_token(punct_kind, p, p + punct_len);
       p += cur->len;
       continue;
     }
@@ -280,7 +412,6 @@ static Token *tokenize(const char *filename, const char *p) {
   }
 
   cur = cur->next = new_token(TOKEN_EOF, p, p);
-  convert_keywords(head.next);
   return head.next;
 }
 

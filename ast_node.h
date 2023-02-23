@@ -3,10 +3,10 @@
 
 #include "tokenizer.h"
 
-typedef struct Node Node;
 
 
 // AST node
+typedef struct Node Node;
 struct Node {
   enum NodeTag {
     NODE_TAG_UNARY,
@@ -31,11 +31,11 @@ typedef enum {
   NODE_STMT_EXPR, // Statement expression
   NODE_RETURN,    // "return"
 } UnaryKind;
-struct UnaryNode {
+typedef struct UnaryNode {
   Node node;
   UnaryKind kind;
   Node *expr;
-};
+} UnaryNode;
 
 typedef enum {
   NODE_ADD,    // +
@@ -48,43 +48,43 @@ typedef enum {
   NODE_LE,     // <=
   NODE_ASSIGN, // =
 } BinaryKind;
-struct BinaryNode {
+typedef struct BinaryNode {
   Node node;
   BinaryKind kind;
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
-};
-struct IfNode {
+} BinaryNode;
+typedef struct IfNode {
   Node node;
   Node *cond_expr;
   Node *then_stmt;
   Node *else_stmt;
-};
-struct ForNode {
+} IfNode;
+typedef struct ForNode {
   Node node;
   Node *init_expr;
   Node *cond_expr;
   Node *inc_expr;
   Node *body_stmt;
-};
-struct BlockNode {
+} ForNode;
+typedef struct BlockNode {
   Node node;
   Node *body;
-};
-struct FunCallNode {
+} BlockNode;
+typedef struct FunCallNode {
   Node node;
   Node *args;
   const char *funcname;
   int funcname_length;
-};
-struct VarNode {
+} FunCallNode;
+typedef struct VarNode {
   Node node;
   struct Obj *var;
-};
-struct NumNode {
+} VarNode;
+typedef struct NumNode {
   Node node;
   int val;
-};
+} NumNode;
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok);
 Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs, const Token *tok);
@@ -92,7 +92,7 @@ Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
                   const Token *tok);
 Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
                    Node *body_stmt, const Token *tok);
-struct BlockNode *new_block_node(Node *body, const Token *tok);
+BlockNode *new_block_node(Node *body, const Token *tok);
 Node *new_fun_call_node(const char *funcname, int funcname_len, Node *args,
                         const Token *tok);
 Node *new_var_node(struct Obj *var, const Token *tok);
