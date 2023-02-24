@@ -19,7 +19,7 @@ Type *int_type() {
   return type;
 }
 
-Member *new_struct_member(Type *type, const Token *name) {
+Member *new_struct_union_member(Type *type, const Token *name) {
   Member *member = calloc(1, sizeof(Member));
   member->type = type;
   member->name = type->name;
@@ -34,6 +34,15 @@ Type *new_struct_type(Member *members, size_t size, size_t align) {
   type->align = align;
   return type;
 }
+Type *new_union_type(Member *members, size_t size, size_t align) {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_UNION;
+  type->members = members;
+  type->size = size;
+  type->align = align;
+  return type;
+}
+
 
 bool is_integer(Type *type) {
   return type->kind == TYPE_INT || type->kind == TYPE_CHAR;

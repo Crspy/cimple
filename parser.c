@@ -2,7 +2,7 @@
 #include "cimple.h"
 #include "tokenizer.h"
 
-// Scope for struct tags
+// Scope for struct or union tags
 typedef struct TagScope TagScope;
 struct TagScope {
   TagScope *next;
@@ -38,6 +38,7 @@ static Obj *locals;
 static Obj *globals;
 
 static Type *struct_decl(const Token **rest, const Token *tok);
+static Type *union_decl(const Token **rest, const Token *tok);
 static Type *declspec(const Token **rest, const Token *tok);
 static Type *declarator(const Token **rest, const Token *tok, Type *type);
 static BlockNode *declaration(const Token **rest, const Token *tok);
@@ -185,6 +186,9 @@ static Type *declspec(const Token **rest, const Token *tok) {
   if (match(rest, tok, TOKEN_STRUCT)) {
     return struct_decl(rest, tok->next);
   }
+  if (match(rest, tok, TOKEN_UNION)) {
+    return union_decl(rest, tok->next);
+  }
   error_tok(tok, "typename expected");
   return NULL;
 }
@@ -277,7 +281,7 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
   return check(tok, TOKEN_CHAR) || check(tok, TOKEN_INT) ||
-         check(tok, TOKEN_STRUCT);
+         check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION);
 }
 
 // stmt = "return" expr ";"
@@ -588,7 +592,7 @@ static Node *unary(const Token **rest, const Token *tok) {
 }
 
 // struct-members = (declspec declarator (","  declarator)* ";")*
-static Member *struct_members(const Token **rest, const Token *tok) {
+static Member *struct_union_members(const Token **rest, const Token *tok) {
   Member head = {0};
   Member *cur = &head;
   while (!check(tok, TOKEN_RIGHT_BRACE)) {
@@ -600,12 +604,49 @@ static Member *struct_members(const Token **rest, const Token *tok) {
         tok = consume(tok, TOKEN_COMMA);
 
       Type *type = declarator(&tok, tok, base_type);
-      cur->next = new_struct_member(type, type->name);
+      cur->next = new_struct_union_member(type, type->name);
       cur = cur->next;
     }
   }
   *rest = tok->next;
   return head.next;
+}
+
+static Type *union_decl(const Token **rest, const Token *tok) {
+  // Read a union tag
+  const Token *tag = NULL;
+  if (check(tok, TOKEN_IDENT)) {
+    tag = tok;
+    tok = tok->next;
+  }
+
+  if (tag && !check(tok, TOKEN_LEFT_BRACE)) {
+    Type *type = find_tag(tag);
+    if (!type)
+      error_tok(tag, "unknown union type");
+    *rest = tok;
+    return type;
+  }
+
+  Member *members = struct_union_members(rest, tok->next);
+  size_t union_align = 1;
+  size_t union_size = 0;
+
+  // If union, we don't have to assign offsets because they
+  // are already initialized to zero. We need to compute the
+  // alignment and the size though.
+  for (Member *mem = members; mem; mem = mem->next) {
+    if (union_align < mem->type->align)
+      union_align = mem->type->align;
+    if (union_size < mem->type->size)
+      union_size = mem->type->size;
+  }
+  union_size = align_to(union_size, union_align);
+  Type *union_type = new_union_type(members, union_size, union_align);
+  // Register the union type if a name was given.
+  if (tag)
+    push_tag_scope(tag, union_type);
+  return union_type;
 }
 
 static Type *struct_decl(const Token **rest, const Token *tok) {
@@ -624,7 +665,7 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
     return type;
   }
 
-  Member *members = struct_members(rest, tok->next);
+  Member *members = struct_union_members(rest, tok->next);
   size_t struct_align = 1;
   // Assign offsets within the struct to members.
   size_t offset = 0;
@@ -645,7 +686,7 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
   return struct_type;
 }
 
-static Member *get_struct_member(Type *type, const Token *tok) {
+static Member *get_struct_union_member(Type *type, const Token *tok) {
   for (Member *mem = type->members; mem; mem = mem->next) {
     if (mem->name->len == tok->len &&
         strncmp(mem->name->loc, tok->loc, tok->len) == 0) {
@@ -656,14 +697,14 @@ static Member *get_struct_member(Type *type, const Token *tok) {
   return NULL;
 }
 
-static Node *struct_ref(Node *lhs, const Token *tok) {
+static Node *struct_union_ref(Node *lhs, const Token *tok) {
   add_type(lhs);
 
-  if (lhs->type->kind != TYPE_STRUCT) {
-    error_tok(lhs->tok, "not a struct");
+  if (lhs->type->kind != TYPE_STRUCT && lhs->type->kind != TYPE_UNION) {
+    error_tok(lhs->tok, "not a struct nor a union");
   }
 
-  Member *member = get_struct_member(lhs->type, tok);
+  Member *member = get_struct_union_member(lhs->type, tok);
   return new_member_node(lhs, member, tok);
 }
 
@@ -682,7 +723,7 @@ static Node *postfix(const Token **rest, const Token *tok) {
     }
 
     if (check(tok, TOKEN_DOT)) {
-      node = struct_ref(node, tok->next);
+      node = struct_union_ref(node, tok->next);
       tok = tok->next->next;
       continue;
     }
@@ -690,7 +731,7 @@ static Node *postfix(const Token **rest, const Token *tok) {
     if (check(tok, TOKEN_ARROW)) {
       // x->y is equivalent to  (*x).y
       node = new_unary_node(NODE_DEREF, node, tok);
-      node = struct_ref(node, tok->next);
+      node = struct_union_ref(node, tok->next);
       tok = tok->next->next;
       continue;
     }

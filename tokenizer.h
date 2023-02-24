@@ -15,6 +15,7 @@ typedef enum {
   TOKEN_CHAR,
   TOKEN_SIZEOF,
   TOKEN_STRUCT,
+  TOKEN_UNION,
   TOKEN_KEYWORDS_COUNT,
 
   // Single-character tokens.

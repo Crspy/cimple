@@ -11,7 +11,8 @@ typedef enum {
   TYPE_PTR,
   TYPE_FUNC,
   TYPE_ARRAY,
-  TYPE_STRUCT
+  TYPE_STRUCT,
+  TYPE_UNION
 } TypeKind;
 
 struct Type {
@@ -60,7 +61,8 @@ Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
 Type *new_struct_type(Member*members , size_t size, size_t align);
-Member *new_struct_member(Type* type,const Token* name);
+Type *new_union_type(Member*members , size_t size, size_t align);
+Member *new_struct_union_member(Type* type,const Token* name);
 Type *array_of(Type *base, size_t size);
 void add_type(Node *node);
 
