@@ -90,8 +90,9 @@ static void gen_addr(Node *node) {
 
 // Load a value from where %rax is pointing to.
 static void load(Type *type) {
-  if (type->kind == TYPE_ARRAY) {
-    // If it is an array, do not attempt to load a value to the
+  if (type->kind == TYPE_ARRAY || type->kind == TYPE_STRUCT ||
+      type->kind == TYPE_UNION) {
+    // If it is an array/struct/union, do not attempt to load a value to the
     // register because in general we can't load an entire array to a
     // register. As a result, the result of an evaluation of an array
     // becomes not the array itself but the address of the array.
@@ -109,6 +110,14 @@ static void load(Type *type) {
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *type) {
   pop("%rdi");
+
+  if (type->kind == TYPE_STRUCT || type->kind == TYPE_UNION) {
+    for (int i = 0; i < type->size; i++) {
+      emitln("\tmov %d(%%rax), %%r8b", i);
+      emitln("\tmov %%r8b, %d(%%rdi)", i);
+    }
+    return;
+  }
 
   if (type->size == 1)
     emitln("\tmov %%al, (%%rdi)");
