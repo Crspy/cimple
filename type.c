@@ -14,8 +14,8 @@ Type *char_type() {
 Type *int_type() {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_INT;
-  type->size = 8;
-  type->align = 8;
+  type->size = 4;
+  type->align = 4;
   return type;
 }
 

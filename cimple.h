@@ -14,6 +14,9 @@
 #include "tokenizer.h"
 #include "obj.h"
 
+#define unreachable() \
+  error("internal error at %s:%d", __FILE__, __LINE__)
+
 //
 // parser.c
 //

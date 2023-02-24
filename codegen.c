@@ -4,6 +4,7 @@
 
 static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
+static char *argreg32[] = {"%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
 static FILE *output_file;
@@ -103,6 +104,8 @@ static void load(Type *type) {
 
   if (type->size == 1)
     emitln("\tmovsbq (%%rax), %%rax");
+  else if (type->size == 4)
+    emitln("\tmovsxd (%%rax), %%rax");
   else
     emitln("\tmov (%%rax), %%rax");
 }
@@ -113,6 +116,7 @@ static void store(Type *type) {
 
   if (type->kind == TYPE_STRUCT || type->kind == TYPE_UNION) {
     for (int i = 0; i < type->size; i++) {
+      // TODO: optimize this
       emitln("\tmov %d(%%rax), %%r8b", i);
       emitln("\tmov %%r8b, %d(%%rdi)", i);
     }
@@ -121,6 +125,8 @@ static void store(Type *type) {
 
   if (type->size == 1)
     emitln("\tmov %%al, (%%rdi)");
+  else if (type->size == 4)
+    emitln("\tmov %%eax, (%%rdi)");
   else
     emitln("\tmov %%rax, (%%rdi)");
 }
@@ -347,6 +353,20 @@ static void emit_data(Obj *prog) {
     }
   }
 }
+static void store_gp(int r, int offset, int sz) {
+  switch (sz) {
+  case 1:
+    emitln("\tmov %s, %d(%%rbp)", argreg8[r], offset);
+    return;
+  case 4:
+    emitln("\tmov %s, %d(%%rbp)", argreg32[r], offset);
+    return;
+  case 8:
+    emitln("\tmov %s, %d(%%rbp)", argreg64[r], offset);
+    return;
+  }
+  unreachable();
+}
 
 static void emit_text(Obj *prog) {
   for (Obj *fn = prog; fn; fn = fn->next) {
@@ -368,12 +388,8 @@ static void emit_text(Obj *prog) {
 
     // Save passed-by-register arguments to the stack
     int i = 0;
-    for (Obj *var = fn->params; var; var = var->next) {
-      if (var->type->size == 1)
-        emitln("\tmov %s, %d(%%rbp)", argreg8[i++], var->offset);
-      else
-        emitln("\tmov %s, %d(%%rbp)", argreg64[i++], var->offset);
-    }
+    for (Obj *var = fn->params; var; var = var->next)
+      store_gp(i++, var->offset, var->type->size);
 
     // Emit code
     gen_stmt(fn->body);
