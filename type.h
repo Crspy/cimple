@@ -4,13 +4,14 @@
 #include "ast_node.h"
 
 typedef struct Type Type;
-
+typedef struct Member Member;
 typedef enum {
   TYPE_CHAR,
   TYPE_INT,
   TYPE_PTR,
   TYPE_FUNC,
   TYPE_ARRAY,
+  TYPE_STRUCT
 } TypeKind;
 
 struct Type {
@@ -20,6 +21,9 @@ struct Type {
 
   // Array
   int array_length;
+
+  // Struct
+  Member *members;
 
   // Pointer-to or array-of type. We intentionally use the same member
   // to represent pointer/array duality in C.
@@ -39,12 +43,23 @@ struct Type {
   Type *next;
 };
 
+// Struct member
+struct Member {
+  Member *next;
+  Type *type;
+  const Token *name;
+  size_t offset;
+};
+
+Member new_member(Type* type,const Token* name);
 Type *int_type();
 Type *char_type();
 bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
+Type *new_struct_type(Member*members , size_t size);
+Member *new_struct_member(Type* type,const Token* name);
 Type *array_of(Type *base, int size);
 void add_type(Node *node);
 

@@ -1,6 +1,7 @@
 #include "ast_node.h"
 #include "cimple.h"
 #include "tokenizer.h"
+#include "type.h"
 
 // Scope for local or global variables.
 typedef struct VarScope VarScope;
@@ -24,6 +25,7 @@ static Scope *scopes = &global_scope;
 static Obj *locals;
 static Obj *globals;
 
+static Type *struct_decl(const Token **rest, const Token *tok);
 static Type *declspec(const Token **rest, const Token *tok);
 static Type *declarator(const Token **rest, const Token *tok, Type *type);
 static BlockNode *declaration(const Token **rest, const Token *tok);
@@ -47,11 +49,9 @@ static void enter_scope(void) {
   scopes = sc;
 }
 
-static void free_scope(Scope* scope)
-{
-  VarScope* var_scope = scope->vars;
-  while(var_scope)
-  {
+static void free_scope(Scope *scope) {
+  VarScope *var_scope = scope->vars;
+  while (var_scope) {
     VarScope *dead_var_scope = var_scope;
     var_scope = var_scope->next;
     free(dead_var_scope);
@@ -137,13 +137,19 @@ static int get_number(const Token *tok) {
   return tok->val;
 }
 
-// declspec = "char" | "int"
+// declspec = "char" | "int" | struct-decl
 static Type *declspec(const Token **rest, const Token *tok) {
   if (match(rest, tok, TOKEN_CHAR)) {
     return char_type();
   }
-  *rest = consume(tok, TOKEN_INT);
-  return int_type();
+  if (match(rest, tok, TOKEN_INT)) {
+    return int_type();
+  }
+  if (match(rest, tok, TOKEN_STRUCT)) {
+    return struct_decl(rest, tok->next);
+  }
+  error_tok(tok, "typename expected");
+  return NULL;
 }
 
 // func-params = (param ("," param)*)? ")"
@@ -233,7 +239,8 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
-  return check(tok, TOKEN_CHAR) || check(tok, TOKEN_INT);
+  return check(tok, TOKEN_CHAR) || check(tok, TOKEN_INT) ||
+         check(tok, TOKEN_STRUCT);
 }
 
 // stmt = "return" expr ";"
@@ -543,19 +550,87 @@ static Node *unary(const Token **rest, const Token *tok) {
   return postfix(rest, tok);
 }
 
-// postfix = primary ("[" expr "]")*
+// struct-members = (declspec declarator (","  declarator)* ";")*
+static Member *struct_members(const Token **rest, const Token *tok) {
+  Member head = {0};
+  Member *cur = &head;
+  while (!check(tok, TOKEN_RIGHT_BRACE)) {
+    Type *base_type = declspec(&tok, tok);
+    int i = 0;
+
+    while (!match(&tok, tok, TOKEN_SEMICOLON)) {
+      if (i++)
+        tok = consume(tok, TOKEN_COMMA);
+
+      Type *type = declarator(&tok, tok, base_type);
+      cur->next = new_struct_member(type, type->name);
+      cur = cur->next;
+    }
+  }
+  *rest = tok->next;
+  return head.next;
+}
+
+static Type *struct_decl(const Token **rest, const Token *tok) {
+  tok = consume(tok, TOKEN_LEFT_BRACE);
+
+  Member *members = struct_members(rest, tok);
+  // Assign offsets within the struct to members.
+  size_t offset = 0;
+  for (Member *mem = members; mem; mem = mem->next) {
+    mem->offset = offset;
+    offset += mem->type->size;
+  }
+  const size_t struct_size = offset;
+
+  return new_struct_type(members, struct_size);
+}
+
+static Member *get_struct_member(Type *type, const Token *tok) {
+  for (Member *mem = type->members; mem; mem = mem->next) {
+    if (mem->name->len == tok->len &&
+        strncmp(mem->name->loc, tok->loc, tok->len) == 0) {
+      return mem;
+    }
+  }
+  error_tok(tok, "no a member of the struct");
+  return NULL;
+}
+
+static Node *struct_ref(Node *lhs, const Token *tok) {
+  add_type(lhs);
+
+  if (lhs->type->kind != TYPE_STRUCT) {
+    error_tok(lhs->tok, "not a struct");
+  }
+
+  Member *member = get_struct_member(lhs->type, tok);
+  return new_member_node(lhs, member, tok);
+}
+
+// postfix = primary ("[" expr "]" | "." ident)*
 static Node *postfix(const Token **rest, const Token *tok) {
   Node *node = primary(&tok, tok);
 
-  while (check(tok, TOKEN_LEFT_BRACKET)) {
-    // x[y] is short for *(x+y)
-    const Token *start = tok;
-    Node *idx = expr(&tok, tok->next);
-    tok = consume(tok, TOKEN_RIGHT_BRACKET);
-    node = new_unary_node(NODE_DEREF, new_add(node, idx, start), start);
+  for (;;) {
+    if (check(tok, TOKEN_LEFT_BRACKET)) {
+      // x[y] is short for *(x+y)
+      const Token *start = tok;
+      Node *idx = expr(&tok, tok->next);
+      tok = consume(tok, TOKEN_RIGHT_BRACKET);
+      node = new_unary_node(NODE_DEREF, new_add(node, idx, start), start);
+      continue;
+    }
+
+    if (check(tok, TOKEN_DOT)) {
+      node = struct_ref(node, tok->next);
+      tok = tok->next->next;
+      continue;
+    }
+
+    *rest = tok;
+    return node;
   }
-  *rest = tok;
-  return node;
 }
 
 // funcall = ident "(" (assign ("," assign)*)? ")"

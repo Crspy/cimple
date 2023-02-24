@@ -17,6 +17,21 @@ Type *int_type() {
   return type;
 }
 
+Member *new_struct_member(Type *type, const Token *name) {
+  Member *member = calloc(1, sizeof(Member));
+  member->type = type;
+  member->name = type->name;
+  return member;
+}
+
+Type *new_struct_type(Member *members, size_t size) {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_STRUCT;
+  type->members = members;
+  type->size = size;
+  return type;
+}
+
 bool is_integer(Type *type) {
   return type->kind == TYPE_INT || type->kind == TYPE_CHAR;
 }
@@ -133,6 +148,11 @@ void add_type(struct Node *node) {
       node->type = binary->rhs->type;
       return;
     }
+    break;
+  }
+  case NODE_TAG_MEMBER: {
+    struct MemberNode *member_node = (struct MemberNode *)node;
+    node->type = member_node->member->type;
     break;
   }
   case NODE_TAG_IF: {

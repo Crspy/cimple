@@ -3,14 +3,13 @@
 
 #include "tokenizer.h"
 
-
-
 // AST node
 typedef struct Node Node;
 struct Node {
   enum NodeTag {
     NODE_TAG_UNARY,
     NODE_TAG_BINARY,
+    NODE_TAG_MEMBER,
     NODE_TAG_IF,
     NODE_TAG_FOR,
     NODE_TAG_BLOCK,
@@ -18,9 +17,9 @@ struct Node {
     NODE_TAG_VAR,
     NODE_TAG_NUM
   } tag;
-  Node *next;         // Next node
-  struct Type *type;  // Type, e.g. int or pointer to int
-  const Token *tok;   // Representative token
+  Node *next;        // Next node
+  struct Type *type; // Type, e.g. int or pointer to int
+  const Token *tok;  // Representative token
 };
 
 typedef enum {
@@ -55,6 +54,11 @@ typedef struct BinaryNode {
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
 } BinaryNode;
+typedef struct MemberNode {
+  Node node;
+  Node *lhs; // Left-hand side
+  struct Member *member; // Right-hand side
+} MemberNode;
 typedef struct IfNode {
   Node node;
   Node *cond_expr;
@@ -89,6 +93,7 @@ typedef struct NumNode {
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok);
 Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs, const Token *tok);
+Node *new_member_node(Node *lhs, struct Member *member, const Token *tok);
 Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
                   const Token *tok);
 Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,

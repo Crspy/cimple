@@ -1,4 +1,5 @@
 
+#include "ast_node.h"
 #include "cimple.h"
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok) {
@@ -17,6 +18,15 @@ Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs,
   node->kind = kind;
   node->lhs = lhs;
   node->rhs = rhs;
+  return (Node *)node;
+}
+Node *new_member_node(Node *lhs, Member *member,
+                             const Token *tok) {
+  MemberNode *node = calloc(1, sizeof(struct MemberNode));
+  node->node.tag = NODE_TAG_MEMBER;
+  node->node.tok = tok;
+  node->lhs = lhs;
+  node->member = member;
   return (Node *)node;
 }
 Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,

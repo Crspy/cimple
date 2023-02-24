@@ -47,6 +47,12 @@ static int align_to(int n, int align) {
 // It's an error if a given node does not reside in memory.
 static void gen_addr(Node *node) {
   switch (node->tag) {
+  case NODE_TAG_MEMBER: {
+    struct MemberNode *member_node = (struct MemberNode *)node;
+    gen_addr(member_node->lhs);
+    emitln("\tadd $%d, %%rax", member_node->member->offset);
+    return;
+  }
   case NODE_TAG_VAR: {
     struct VarNode *var_node = (struct VarNode *)node;
     if (var_node->var->is_local) {
@@ -195,6 +201,11 @@ static void gen_expr(Node *node) {
       break;
     }
     break;
+  }
+  case NODE_TAG_MEMBER: {
+    gen_addr(node);
+    load(node->type);
+    return;
   }
   case NODE_TAG_FUNCALL: {
     struct FunCallNode *fun_call = (struct FunCallNode *)node;
