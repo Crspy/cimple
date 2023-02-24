@@ -6,7 +6,7 @@
 typedef struct Obj Obj;
 struct Obj {
   Obj *next;
-  const char *name; // Variable name
+  char *name; // Variable name
   int name_length;  // Variable name length
   struct Type *type;       // Type
   bool is_local;    // local or global/function

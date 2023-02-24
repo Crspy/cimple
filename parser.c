@@ -1,4 +1,13 @@
 #include "cimple.h"
+#include "tokenizer.h"
+
+// Scope for struct tags
+typedef struct TagScope TagScope;
+struct TagScope {
+  TagScope *next;
+  const Token *name;
+  Type *type;
+};
 
 // Scope for local or global variables.
 typedef struct VarScope VarScope;
@@ -11,7 +20,11 @@ struct VarScope {
 typedef struct Scope Scope;
 struct Scope {
   Scope *next;
+
+  // C has two block scopes; one is for variables and the other is
+  // for struct tags.
   VarScope *vars;
+  TagScope *tags;
 };
 
 static Scope global_scope = {NULL};
@@ -20,6 +33,7 @@ static Scope *scopes = &global_scope;
 // All local variable instances created during parsing are
 // accumulated to this list.
 static Obj *locals;
+// Likewise, global variables are accumulated to this list.
 static Obj *globals;
 
 static Type *struct_decl(const Token **rest, const Token *tok);
@@ -47,10 +61,18 @@ static void enter_scope(void) {
 }
 
 static void free_scope(Scope *scope) {
+  // free Var scopes
   VarScope *var_scope = scope->vars;
   while (var_scope) {
     VarScope *dead_var_scope = var_scope;
     var_scope = var_scope->next;
+    free(dead_var_scope);
+  }
+  // free tag scopes
+  TagScope *tag_scope = scope->tags;
+  while (tag_scope) {
+    TagScope *dead_var_scope = tag_scope;
+    tag_scope = tag_scope->next;
     free(dead_var_scope);
   }
   free(scope);
@@ -74,6 +96,23 @@ static const Obj *find_var(const Token *tok) {
   return NULL;
 }
 
+static Type *find_tag(const Token *tok) {
+  for (Scope *sc = scopes; sc; sc = sc->next)
+    for (TagScope *tag_sc = sc->tags; tag_sc; tag_sc = tag_sc->next)
+      if (tok->len == tag_sc->name->len &&
+          strncmp(tok->loc, tag_sc->name->loc, tok->len) == 0)
+        return tag_sc->type;
+  return NULL;
+}
+
+static void push_tag_scope(const Token *tok, Type *type) {
+  TagScope *sc = calloc(1, sizeof(TagScope));
+  sc->name = tok;
+  sc->type = type;
+  sc->next = scopes->tags;
+  scopes->tags = sc;
+}
+
 static VarScope *push_scope(Obj *var) {
   VarScope *sc = malloc(sizeof(VarScope));
   sc->var = var;
@@ -82,7 +121,7 @@ static VarScope *push_scope(Obj *var) {
   return sc;
 }
 
-static Obj *new_var(Type *type, const char *name, int len) {
+static Obj *new_var(Type *type, char *name, int len) {
   Obj *var = calloc(1, sizeof(Obj));
   var->name = name;
   var->name_length = len;
@@ -91,14 +130,14 @@ static Obj *new_var(Type *type, const char *name, int len) {
   return var;
 }
 
-static Obj *new_lvar(Type *type, const char *name, int name_len) {
+static Obj *new_lvar(Type *type, char *name, int name_len) {
   Obj *var = new_var(type, name, name_len);
   var->is_local = true;
   var->next = locals;
   locals = var;
   return var;
 }
-static Obj *new_gvar(Type *type, const char *name, int name_len) {
+static Obj *new_gvar(Type *type, char *name, int name_len) {
   Obj *var = new_var(type, name, name_len);
   var->next = globals;
   globals = var;
@@ -120,7 +159,7 @@ static Obj *new_string_literal(char *str, Type *type) {
   return var;
 }
 
-static const char *get_ident(const Token *tok) {
+static char *get_ident(const Token *tok) {
   if (tok->kind != TOKEN_IDENT) {
     error_tok(tok, "expected an identifier");
   }
@@ -569,9 +608,22 @@ static Member *struct_members(const Token **rest, const Token *tok) {
 }
 
 static Type *struct_decl(const Token **rest, const Token *tok) {
-  tok = consume(tok, TOKEN_LEFT_BRACE);
+  // Read a struct tag.
+  const Token *tag = NULL;
+  if (check(tok, TOKEN_IDENT)) {
+    tag = tok;
+    tok = tok->next;
+  }
 
-  Member *members = struct_members(rest, tok);
+  if (tag && !check( tok, TOKEN_LEFT_BRACE)) {
+    Type *type = find_tag(tag);
+    if (!type)
+      error_tok(tag, "unknown struct type");
+    *rest = tok;
+    return type;
+  }
+
+  Member *members = struct_members(rest, tok->next);
   size_t struct_align = 1;
   // Assign offsets within the struct to members.
   size_t offset = 0;
@@ -580,13 +632,16 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
     mem->offset = offset;
     offset += mem->type->size;
 
-    if(struct_align < mem->type->align)
-    {
+    if (struct_align < mem->type->align) {
       struct_align = mem->type->align;
     }
   }
   const size_t struct_size = align_to(offset, struct_align);
-  return new_struct_type(members, struct_size,struct_align);
+  Type *struct_type = new_struct_type(members, struct_size, struct_align);
+  // Register the struct type if a name was given.
+  if (tag)
+    push_tag_scope(tag, struct_type);
+  return struct_type;
 }
 
 static Member *get_struct_member(Type *type, const Token *tok) {
