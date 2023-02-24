@@ -1,3 +1,4 @@
+#include "ast_node.h"
 #include "cimple.h"
 #include "tokenizer.h"
 
@@ -615,7 +616,7 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
     tok = tok->next;
   }
 
-  if (tag && !check( tok, TOKEN_LEFT_BRACE)) {
+  if (tag && !check(tok, TOKEN_LEFT_BRACE)) {
     Type *type = find_tag(tag);
     if (!type)
       error_tok(tag, "unknown struct type");
@@ -666,7 +667,7 @@ static Node *struct_ref(Node *lhs, const Token *tok) {
   return new_member_node(lhs, member, tok);
 }
 
-// postfix = primary ("[" expr "]" | "." ident)*
+// postfix = primary ("[" expr "]" | "." ident | "->" ident)*
 static Node *postfix(const Token **rest, const Token *tok) {
   Node *node = primary(&tok, tok);
 
@@ -681,6 +682,14 @@ static Node *postfix(const Token **rest, const Token *tok) {
     }
 
     if (check(tok, TOKEN_DOT)) {
+      node = struct_ref(node, tok->next);
+      tok = tok->next->next;
+      continue;
+    }
+
+    if (check(tok, TOKEN_ARROW)) {
+      // x->y is equivalent to  (*x).y
+      node = new_unary_node(NODE_DEREF, node, tok);
       node = struct_ref(node, tok->next);
       tok = tok->next->next;
       continue;

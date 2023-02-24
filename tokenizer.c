@@ -44,6 +44,7 @@ static const char *tokens_strings[TOKEN_TOTAL_COUNT] = {
     [TOKEN_LESS_EQUAL] = "<=",
     [TOKEN_PLUS_PLUS] = "++",
     [TOKEN_MINUS_MINUS] = "--",
+    [TOKEN_ARROW] = "->",
     [TOKEN_IDENT] = "identifier",
     [TOKEN_STR] = "string literal",
     [TOKEN_NUM] = "numeric literal",
@@ -139,7 +140,7 @@ bool match(const Token **rest, const Token *tok, TokenKind kind) {
 }
 
 // Create a new token.
-static Token *new_token(TokenKind kind, size_t line_no, const char* line_start,
+static Token *new_token(TokenKind kind, size_t line_no, const char *line_start,
                         const char *start, const char *end) {
   Token *tok = malloc(sizeof(Token));
   tok->kind = kind;
@@ -196,6 +197,9 @@ static int read_punct(const char *p, TokenKind *kind) {
   case '-':
     if (p[1] == '-') {
       *kind = TOKEN_MINUS_MINUS;
+      return 2;
+    } else if (p[1] == '>') {
+      *kind = TOKEN_ARROW;
       return 2;
     }
     *kind = TOKEN_MINUS;
@@ -339,7 +343,8 @@ static const char *string_literal_end(const char *p) {
   return p;
 }
 
-static Token *read_string_literal(const char *start, size_t line_no,const char* line_start) {
+static Token *read_string_literal(const char *start, size_t line_no,
+                                  const char *line_start) {
   const char *end = string_literal_end(start + 1);
   char *buf = malloc(end - start);
   int len = 0;
@@ -353,7 +358,7 @@ static Token *read_string_literal(const char *start, size_t line_no,const char* 
   }
   buf[len] = '\0';
 
-  Token *tok = new_token(TOKEN_STR, line_no, line_start,start, end + 1);
+  Token *tok = new_token(TOKEN_STR, line_no, line_start, start, end + 1);
   tok->type = array_of(char_type(), len + 1);
   tok->str = buf;
   return tok;
@@ -421,7 +426,7 @@ static Token *tokenize(const char *filename, const char *p) {
 
     // String literal
     if (*p == '"') {
-      cur = cur->next = read_string_literal(p, line_no,line_start);
+      cur = cur->next = read_string_literal(p, line_no, line_start);
       p += cur->len;
       continue;
     }
@@ -432,7 +437,7 @@ static Token *tokenize(const char *filename, const char *p) {
       do {
         p++;
       } while (is_ident2(*p));
-      cur = cur->next = new_token(TOKEN_IDENT, line_no,line_start, start, p);
+      cur = cur->next = new_token(TOKEN_IDENT, line_no, line_start, start, p);
 
       TokenKind keywordKind;
       if (find_keyword(cur, &keywordKind)) {
@@ -445,7 +450,8 @@ static Token *tokenize(const char *filename, const char *p) {
     TokenKind punct_kind;
     int punct_len = read_punct(p, &punct_kind);
     if (punct_len) {
-      cur = cur->next = new_token(punct_kind, line_no, line_start,p, p + punct_len);
+      cur = cur->next =
+          new_token(punct_kind, line_no, line_start, p, p + punct_len);
       p += cur->len;
       continue;
     }
@@ -453,7 +459,7 @@ static Token *tokenize(const char *filename, const char *p) {
     error_at(p, "invalid token");
   }
 
-  cur = cur->next = new_token(TOKEN_EOF, line_no,line_start, p, p);
+  cur = cur->next = new_token(TOKEN_EOF, line_no, line_start, p, p);
   return head.next;
 }
 

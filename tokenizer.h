@@ -45,6 +45,7 @@ typedef enum {
   TOKEN_LESS_EQUAL,
   TOKEN_PLUS_PLUS,
   TOKEN_MINUS_MINUS,
+  TOKEN_ARROW,
 
   // Literals.
   TOKEN_IDENT, // Identifiers
