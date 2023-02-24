@@ -26,5 +26,6 @@ Obj *parse(const Token *tok);
 //
 
 void codegen(Obj *prog,FILE* out);
+int align_to(int n, int align);
 
 #endif /* CIMPLE_HEADER_GUARD */

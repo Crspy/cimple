@@ -38,7 +38,7 @@ bool isPowerofTwo(int n) { return (n != 0) && ((n & (n - 1)) == 0); }
 
 // Round up `n` to the nearest multiple of `align` (where align is a power of 2)
 // For instance, align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
-static int align_to(int n, int align) {
+int align_to(int n, int align) {
   assert(isPowerofTwo(align));
   return ((n - 1) & -align) + align;
 }

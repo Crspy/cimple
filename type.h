@@ -17,10 +17,11 @@ typedef enum {
 struct Type {
   TypeKind kind;
 
-  int size; // sizeof() value
+  size_t size; // sizeof() value
 
   // Array
-  int array_length;
+  size_t array_length;
+  size_t align;
 
   // Struct
   Member *members;
@@ -58,9 +59,9 @@ bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_type);
-Type *new_struct_type(Member*members , size_t size);
+Type *new_struct_type(Member*members , size_t size, size_t align);
 Member *new_struct_member(Type* type,const Token* name);
-Type *array_of(Type *base, int size);
+Type *array_of(Type *base, size_t size);
 void add_type(Node *node);
 
 #endif /* TYPE_HEADER_GUARD */

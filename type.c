@@ -7,6 +7,7 @@ Type *char_type() {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_CHAR;
   type->size = 1;
+  type->align = 1;
   return type;
 }
 
@@ -14,6 +15,7 @@ Type *int_type() {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_INT;
   type->size = 8;
+  type->align = 8;
   return type;
 }
 
@@ -24,11 +26,12 @@ Member *new_struct_member(Type *type, const Token *name) {
   return member;
 }
 
-Type *new_struct_type(Member *members, size_t size) {
+Type *new_struct_type(Member *members, size_t size, size_t align) {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_STRUCT;
   type->members = members;
   type->size = size;
+  type->align = align;
   return type;
 }
 
@@ -46,6 +49,7 @@ Type *pointer_to(Type *base) {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_PTR;
   type->size = 8;
+  type->align = 8;
   type->base = base;
   return type;
 }
@@ -57,10 +61,11 @@ Type *func_type(Type *return_type) {
   return type;
 }
 
-Type *array_of(Type *base, int len) {
+Type *array_of(Type *base, size_t len) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TYPE_ARRAY;
   ty->size = base->size * len;
+  ty->align = base->align;
   ty->base = base;
   ty->array_length = len;
   return ty;

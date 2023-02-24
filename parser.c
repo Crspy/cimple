@@ -1,7 +1,4 @@
-#include "ast_node.h"
 #include "cimple.h"
-#include "tokenizer.h"
-#include "type.h"
 
 // Scope for local or global variables.
 typedef struct VarScope VarScope;
@@ -575,15 +572,21 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
   tok = consume(tok, TOKEN_LEFT_BRACE);
 
   Member *members = struct_members(rest, tok);
+  size_t struct_align = 1;
   // Assign offsets within the struct to members.
   size_t offset = 0;
   for (Member *mem = members; mem; mem = mem->next) {
+    offset = align_to(offset, mem->type->align);
     mem->offset = offset;
     offset += mem->type->size;
-  }
-  const size_t struct_size = offset;
 
-  return new_struct_type(members, struct_size);
+    if(struct_align < mem->type->align)
+    {
+      struct_align = mem->type->align;
+    }
+  }
+  const size_t struct_size = align_to(offset, struct_align);
+  return new_struct_type(members, struct_size,struct_align);
 }
 
 static Member *get_struct_member(Type *type, const Token *tok) {
