@@ -9,6 +9,7 @@ typedef enum {
   TYPE_CHAR,
   TYPE_SHORT,
   TYPE_INT,
+  TYPE_LONG,
   TYPE_PTR,
   TYPE_FUNC,
   TYPE_ARRAY,
@@ -55,6 +56,7 @@ struct Member {
 };
 
 Member new_member(Type* type,const Token* name);
+Type *long_type();
 Type *int_type();
 Type *short_type();
 Type *char_type();

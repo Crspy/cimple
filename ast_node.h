@@ -88,7 +88,7 @@ typedef struct VarNode {
 } VarNode;
 typedef struct NumNode {
   Node node;
-  int val;
+  int64_t val;
 } NumNode;
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok);
@@ -102,6 +102,6 @@ BlockNode *new_block_node(Node *body, const Token *tok);
 Node *new_fun_call_node(const char *funcname, int funcname_len, Node *args,
                         const Token *tok);
 Node *new_var_node(const struct Obj *var, const Token *tok);
-Node *new_num_node(int val, const Token *tok);
+Node *new_num_node(int64_t val, const Token *tok);
 
 #endif /* AST_NODE_HEADER_GUARD */

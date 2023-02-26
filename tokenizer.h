@@ -1,7 +1,8 @@
 #ifndef TOKENIZER_HEADER_GUARD
 #define TOKENIZER_HEADER_GUARD
-#include "stddef.h"
-#include "stdbool.h"
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
   // Keywords.
@@ -11,6 +12,7 @@ typedef enum {
   TOKEN_ELSE,
   TOKEN_FOR,
   TOKEN_WHILE,
+  TOKEN_LONG,
   TOKEN_INT,
   TOKEN_SHORT,
   TOKEN_CHAR,
@@ -63,7 +65,7 @@ typedef struct Token Token;
 struct Token {
   TokenKind kind;    // Token kind
   Token *next;       // Next token
-  int val;           // If kind is TOKEN_NUM, its value
+  int64_t val;           // If kind is TOKEN_NUM, its value
   const char *loc;   // Token location
   int len;           // Token length
   struct Type *type; // Used if TOKENK_STR

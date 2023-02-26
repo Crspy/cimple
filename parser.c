@@ -175,7 +175,7 @@ static int get_number(const Token *tok) {
   return tok->val;
 }
 
-// declspec = "char" | "int" | struct-decl
+// declspec = "char" | "short" | "int" | "long" | struct-decl
 static Type *declspec(const Token **rest, const Token *tok) {
   if (match(rest, tok, TOKEN_CHAR)) {
     return char_type();
@@ -185,6 +185,9 @@ static Type *declspec(const Token **rest, const Token *tok) {
   }
   if (match(rest, tok, TOKEN_INT)) {
     return int_type();
+  }
+  if (match(rest, tok, TOKEN_LONG)) {
+    return long_type();
   }
   if (match(rest, tok, TOKEN_STRUCT)) {
     return struct_decl(rest, tok->next);
@@ -284,8 +287,8 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
   return check(tok, TOKEN_CHAR) || check(tok, TOKEN_SHORT) ||
-         check(tok, TOKEN_INT) || check(tok, TOKEN_STRUCT) ||
-         check(tok, TOKEN_UNION);
+         check(tok, TOKEN_INT) || check(tok, TOKEN_LONG) ||
+         check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION);
 }
 
 // stmt = "return" expr ";"

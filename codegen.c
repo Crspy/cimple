@@ -250,7 +250,7 @@ static void gen_expr(Node *node) {
     return;
   }
   case NODE_TAG_NUM:
-    emitln("\tmov $%d, %%rax", ((struct NumNode *)node)->val);
+    emitln("\tmov $%ld, %%rax", ((struct NumNode *)node)->val);
     return;
   default:
     break;

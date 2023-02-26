@@ -26,6 +26,13 @@ Type *int_type() {
   type->align = 4;
   return type;
 }
+Type *long_type() {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_LONG;
+  type->size = 8;
+  type->align = 8;
+  return type;
+}
 
 Member *new_struct_union_member(Type *type, const Token *name) {
   Member *member = calloc(1, sizeof(Member));
@@ -53,7 +60,7 @@ Type *new_union_type(Member *members, size_t size, size_t align) {
 
 
 bool is_integer(Type *type) {
-  return type->kind == TYPE_INT || type->kind == TYPE_SHORT || type->kind == TYPE_CHAR;
+  return  type->kind == TYPE_LONG || type->kind == TYPE_INT || type->kind == TYPE_SHORT || type->kind == TYPE_CHAR;
 }
 
 Type *copy_type(Type *type) {
@@ -158,7 +165,7 @@ void add_type(struct Node *node) {
     case NODE_NE:
     case NODE_LT:
     case NODE_LE:
-      node->type = int_type();
+      node->type = long_type();
       return;
     case NODE_ASSIGN:
       if (binary->lhs->type->kind == TYPE_ARRAY) {
@@ -204,7 +211,7 @@ void add_type(struct Node *node) {
     for (Node *n = fun_call->args; n; n = n->next) {
       add_type(n);
     }
-    node->type = int_type();
+    node->type = long_type();
     return;
   }
   case NODE_TAG_VAR: {
@@ -213,7 +220,7 @@ void add_type(struct Node *node) {
     return;
   }
   case NODE_TAG_NUM:
-    node->type = int_type();
+    node->type = long_type();
     return;
   }
 }

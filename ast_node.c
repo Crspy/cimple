@@ -74,7 +74,7 @@ Node *new_var_node(const Obj *var, const Token *tok) {
   node->var = var;
   return (Node *)node;
 }
-Node *new_num_node(int val, const Token *tok) {
+Node *new_num_node(int64_t val, const Token *tok) {
   struct NumNode *node = calloc(1, sizeof(struct NumNode));
   node->node.tag = NODE_TAG_NUM;
   node->node.tok = tok;
