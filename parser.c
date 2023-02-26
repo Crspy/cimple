@@ -180,6 +180,9 @@ static Type *declspec(const Token **rest, const Token *tok) {
   if (match(rest, tok, TOKEN_CHAR)) {
     return char_type();
   }
+  if (match(rest, tok, TOKEN_SHORT)) {
+    return short_type();
+  }
   if (match(rest, tok, TOKEN_INT)) {
     return int_type();
   }
@@ -280,8 +283,9 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
-  return check(tok, TOKEN_CHAR) || check(tok, TOKEN_INT) ||
-         check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION);
+  return check(tok, TOKEN_CHAR) || check(tok, TOKEN_SHORT) ||
+         check(tok, TOKEN_INT) || check(tok, TOKEN_STRUCT) ||
+         check(tok, TOKEN_UNION);
 }
 
 // stmt = "return" expr ";"

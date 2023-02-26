@@ -1,5 +1,6 @@
 #include "ast_node.h"
 #include "cimple.h"
+#include "type.h"
 
 /*static Type type_int = {.kind = TYPE_INT, .size = 8};*/
 
@@ -8,6 +9,13 @@ Type *char_type() {
   type->kind = TYPE_CHAR;
   type->size = 1;
   type->align = 1;
+  return type;
+}
+Type *short_type() {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_SHORT;
+  type->size = 2;
+  type->align = 2;
   return type;
 }
 
@@ -45,7 +53,7 @@ Type *new_union_type(Member *members, size_t size, size_t align) {
 
 
 bool is_integer(Type *type) {
-  return type->kind == TYPE_INT || type->kind == TYPE_CHAR;
+  return type->kind == TYPE_INT || type->kind == TYPE_SHORT || type->kind == TYPE_CHAR;
 }
 
 Type *copy_type(Type *type) {

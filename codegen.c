@@ -4,6 +4,7 @@
 
 static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
+static char *argreg16[] = {"%di", "%si", "%dx", "%cx", "%r8w", "%r9w"};
 static char *argreg32[] = {"%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
@@ -104,6 +105,8 @@ static void load(Type *type) {
 
   if (type->size == 1)
     emitln("\tmovsbq (%%rax), %%rax");
+  else if (type->size == 2)
+    emitln("\tmovswq (%%rax), %%rax");
   else if (type->size == 4)
     emitln("\tmovsxd (%%rax), %%rax");
   else
@@ -125,6 +128,8 @@ static void store(Type *type) {
 
   if (type->size == 1)
     emitln("\tmov %%al, (%%rdi)");
+  else if (type->size == 2)
+    emitln("\tmov %%ax, (%%rdi)");
   else if (type->size == 4)
     emitln("\tmov %%eax, (%%rdi)");
   else
@@ -357,6 +362,9 @@ static void store_gp(int r, int offset, int sz) {
   switch (sz) {
   case 1:
     emitln("\tmov %s, %d(%%rbp)", argreg8[r], offset);
+    return;
+  case 2:
+    emitln("\tmov %s, %d(%%rbp)", argreg16[r], offset);
     return;
   case 4:
     emitln("\tmov %s, %d(%%rbp)", argreg32[r], offset);

@@ -7,6 +7,7 @@ typedef struct Type Type;
 typedef struct Member Member;
 typedef enum {
   TYPE_CHAR,
+  TYPE_SHORT,
   TYPE_INT,
   TYPE_PTR,
   TYPE_FUNC,
@@ -55,6 +56,7 @@ struct Member {
 
 Member new_member(Type* type,const Token* name);
 Type *int_type();
+Type *short_type();
 Type *char_type();
 bool is_integer(Type *type);
 Type *copy_type(Type *type);
