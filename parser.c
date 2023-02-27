@@ -226,12 +226,13 @@ static Type *func_params(const Token **rest, const Token *tok,
 //             | "[" num "]" type-suffix
 //             | ε
 static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
-  if (check(tok, TOKEN_LEFT_PAREN))
-    return func_params(rest, tok->next, type);
+  if (match(&tok,tok, TOKEN_LEFT_PAREN))
+    return func_params(rest, tok, type);
 
-  if (check(tok, TOKEN_LEFT_BRACKET)) {
-    int array_count = get_number(tok->next);
-    tok = consume(tok->next->next, TOKEN_RIGHT_BRACKET);
+  if (match(&tok,tok, TOKEN_LEFT_BRACKET)) {
+    int array_count = get_number(tok);
+    tok = consume(tok,TOKEN_NUM);
+    tok = consume(tok, TOKEN_RIGHT_BRACKET);
     type = type_suffix(rest, tok, type);
     return array_of(type, array_count);
   }
@@ -240,10 +241,19 @@ static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
   return type;
 }
 
-// declarator = "*"* ident type-suffix
+// declarator = "*"* ( ident | "(" ident ")" | "(" declarator ")" ) type-suffix
 static Type *declarator(const Token **rest, const Token *tok, Type *type) {
   while (match(&tok, tok, TOKEN_STAR)) {
     type = pointer_to(type);
+  }
+
+  if (match(&tok,tok, TOKEN_LEFT_PAREN)) {
+    const Token *start = tok;
+    Type dummy = {0};
+    declarator(&tok, start, &dummy);
+    tok = consume(tok, TOKEN_RIGHT_PAREN);
+    type = type_suffix(rest, tok, type);
+    return declarator(&tok, start, type);
   }
 
   if (tok->kind != TOKEN_IDENT)
@@ -360,8 +370,8 @@ static Node *stmt(const Token **rest, const Token *tok) {
     return node;
   }
 
-  if (check(tok, TOKEN_LEFT_BRACE)) {
-    return (Node *)compound_stmt(rest, tok->next);
+  if (match(&tok,tok, TOKEN_LEFT_BRACE)) {
+    return (Node *)compound_stmt(rest, tok);
   }
 
   return expr_stmt(rest, tok);
@@ -729,17 +739,20 @@ static Node *postfix(const Token **rest, const Token *tok) {
       continue;
     }
 
-    if (check(tok, TOKEN_DOT)) {
-      node = struct_union_ref(node, tok->next);
-      tok = tok->next->next;
+    if (match(&tok,tok, TOKEN_DOT)) {
+      node = struct_union_ref(node, tok);
+      tok = consume(tok,TOKEN_IDENT);
+     // tok = tok->next; // skip the "ident" after the "."
       continue;
     }
 
     if (check(tok, TOKEN_ARROW)) {
       // x->y is equivalent to  (*x).y
       node = new_unary_node(NODE_DEREF, node, tok);
-      node = struct_union_ref(node, tok->next);
-      tok = tok->next->next;
+      tok = consume(tok,TOKEN_ARROW);
+      node = struct_union_ref(node, tok);
+      tok = consume(tok,TOKEN_IDENT);
+      //tok = tok->next->next;
       continue;
     }
 
@@ -786,10 +799,9 @@ static Node *primary(const Token **rest, const Token *tok) {
     BlockNode *block_node = compound_stmt(&tok, tok->next->next);
     *rest = consume(tok, TOKEN_RIGHT_PAREN);
     return new_unary_node(NODE_STMT_EXPR, block_node->body, start);
-    ;
   }
-  if (check(tok, TOKEN_LEFT_PAREN)) {
-    Node *node = expr(&tok, tok->next);
+  if (match(&tok,tok, TOKEN_LEFT_PAREN)) {
+    Node *node = expr(&tok, tok);
     *rest = consume(tok, TOKEN_RIGHT_PAREN);
     return node;
   }
