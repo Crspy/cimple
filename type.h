@@ -6,6 +6,7 @@
 typedef struct Type Type;
 typedef struct Member Member;
 typedef enum {
+  TYPE_VOID,
   TYPE_CHAR,
   TYPE_SHORT,
   TYPE_INT,
@@ -60,6 +61,7 @@ Type *long_type();
 Type *int_type();
 Type *short_type();
 Type *char_type();
+Type *void_type();
 bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);

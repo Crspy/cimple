@@ -175,8 +175,11 @@ static int get_number(const Token *tok) {
   return tok->val;
 }
 
-// declspec = "char" | "short" | "int" | "long" | struct-decl
+// declspec = "void" | "char" | "short" | "int" | "long" | struct-decl
 static Type *declspec(const Token **rest, const Token *tok) {
+  if (match(rest, tok, TOKEN_VOID)) {
+    return void_type();
+  }
   if (match(rest, tok, TOKEN_CHAR)) {
     return char_type();
   }
@@ -278,6 +281,10 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
       tok = consume(tok, TOKEN_COMMA);
 
     Type *type = declarator(&tok, tok, base_type);
+    if (type->kind == TYPE_VOID)
+    {
+      error_tok(tok, "variable declared void");
+    }
     Obj *var = new_lvar(type, get_ident(type->name), type->name->len);
 
     if (!check(tok, TOKEN_EQUAL))
@@ -296,9 +303,19 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
-  return check(tok, TOKEN_CHAR) || check(tok, TOKEN_SHORT) ||
-         check(tok, TOKEN_INT) || check(tok, TOKEN_LONG) ||
-         check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION);
+  switch(tok->kind)
+  {
+    case TOKEN_VOID:
+    case TOKEN_CHAR:
+    case TOKEN_SHORT:
+    case TOKEN_INT:
+    case TOKEN_LONG:
+    case TOKEN_STRUCT:
+    case TOKEN_UNION:
+      return true;
+    default:
+      return false;
+  }
 }
 
 // stmt = "return" expr ";"

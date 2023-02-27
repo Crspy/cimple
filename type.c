@@ -3,7 +3,13 @@
 #include "type.h"
 
 /*static Type type_int = {.kind = TYPE_INT, .size = 8};*/
-
+Type *void_type() {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_VOID;
+  type->size = 1;
+  type->align = 1;
+  return type;
+}
 Type *char_type() {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_CHAR;
