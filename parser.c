@@ -376,6 +376,31 @@ static Type *declarator(const Token **rest, const Token *tok, Type *type) {
   return type;
 }
 
+// abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix
+static Type *abstract_declarator(const Token **rest, const Token *tok,
+                                 Type *type) {
+  while (match(&tok, tok, TOKEN_STAR)) {
+    type = pointer_to(type);
+  }
+
+  if (match(&tok, tok, TOKEN_LEFT_PAREN)) {
+    const Token *start = tok;
+    Type dummy = {0};
+    abstract_declarator(&tok, start, &dummy);
+    tok = consume(tok, TOKEN_RIGHT_PAREN);
+    type = type_suffix(rest, tok, type);
+    return abstract_declarator(&tok, start, type);
+  }
+
+  return type_suffix(rest, tok, type);
+}
+
+// type-name = declspec abstract-declarator
+static Type *typename(const Token **rest, const Token *tok) {
+  Type *type = declspec(&tok, tok, NULL);
+  return abstract_declarator(rest, tok, type);
+}
+
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
 // expr)?)*)? ";"
 static BlockNode *declaration(const Token **rest, const Token *tok,
@@ -926,9 +951,10 @@ static Node *funcall(const Token **rest, const Token *tok) {
 //         | str
 //         | num
 static Node *primary(const Token **rest, const Token *tok) {
+  const Token *start = tok;
+
   if (check(tok, TOKEN_LEFT_PAREN) && check(tok->next, TOKEN_LEFT_BRACE)) {
     // This is a GNU statement expresssion.
-    const Token *start = tok;
 
     BlockNode *block_node = compound_stmt(&tok, tok->next->next);
     *rest = consume(tok, TOKEN_RIGHT_PAREN);
@@ -941,6 +967,12 @@ static Node *primary(const Token **rest, const Token *tok) {
   }
 
   if (check(tok, TOKEN_SIZEOF)) {
+    if (check(tok->next, TOKEN_LEFT_PAREN) && is_typename(tok->next->next)) {
+      // sizeof(typename)
+      Type *type = typename(&tok, tok->next->next);
+      *rest = consume(tok, TOKEN_RIGHT_PAREN);
+      return new_num_node(type->size, start);
+    }
     Node *node = unary(rest, tok->next);
     add_type(node);
     return new_num_node(node->type->size, tok);
