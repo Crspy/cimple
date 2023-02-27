@@ -1,6 +1,7 @@
 #include "ast_node.h"
 #include "cimple.h"
 #include "tokenizer.h"
+#include "type.h"
 
 // Scope for struct or union tags
 typedef struct TagScope TagScope;
@@ -37,6 +38,7 @@ static Obj *locals;
 // Likewise, global variables are accumulated to this list.
 static Obj *globals;
 
+static bool is_typename(const Token *tok);
 static Type *struct_decl(const Token **rest, const Token *tok);
 static Type *union_decl(const Token **rest, const Token *tok);
 static Type *declspec(const Token **rest, const Token *tok);
@@ -175,31 +177,98 @@ static int get_number(const Token *tok) {
   return tok->val;
 }
 
-// declspec = "void" | "char" | "short" | "int" | "long" | struct-decl
+// declspec = ("void" | "char" | "short" | "int" | "long"
+//             | struct-decl | union-decl)+
+//
+// The order of typenames in a type-specifier doesn't matter. For
+// example, `int long static` means the same as `static long int`.
+// That can also be written as `static long` because you can omit
+// `int` if `long` or `short` are specified. However, something like
+// `char int` is not a valid type specifier. We have to accept only a
+// limited combinations of the typenames.
+//
+// In this function, we count the number of occurrences of each typename
+// while keeping the "current" type object that the typenames up
+// until that point represent. When we reach a non-typename token,
+// we returns the current type object.
 static Type *declspec(const Token **rest, const Token *tok) {
-  if (match(rest, tok, TOKEN_VOID)) {
-    return void_type();
+  // We use a single integer as counters for all typenames.
+  // For example, bits 0 and 1 represents how many times we saw the
+  // keyword "void" so far. With this, we can use a switch statement
+  // as you can see below.
+  enum {
+    VOID = 1 << 0,
+    CHAR = 1 << 2,
+    SHORT = 1 << 4,
+    INT = 1 << 6,
+    LONG = 1 << 8,
+    OTHER = 1 << 10,
+  };
+
+  Type *type = int_type();
+  int counter = 0;
+
+  while (is_typename(tok)) {
+    // Handle user-defined types.
+    if (check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION)) {
+      if (check(tok, TOKEN_STRUCT)) {
+        type = struct_decl(&tok, tok->next);
+      } else {
+        type = union_decl(&tok, tok->next);
+      }
+
+      counter += OTHER;
+      continue;
+    }
+
+    // Handle built-in types.
+    switch (tok->kind) {
+    case TOKEN_VOID:
+      counter += VOID;
+      break;
+    case TOKEN_CHAR:
+      counter += CHAR;
+      break;
+    case TOKEN_SHORT:
+      counter += SHORT;
+      break;
+    case TOKEN_INT:
+      counter += INT;
+      break;
+    case TOKEN_LONG:
+      counter += LONG;
+      break;
+    default:
+      unreachable();
+    }
+
+    switch (counter) {
+    case VOID:
+      type = void_type();
+      break;
+    case CHAR:
+      type = char_type();
+      break;
+    case SHORT:
+    case SHORT + INT:
+      type = short_type();
+      break;
+    case INT:
+      type = int_type();
+      break;
+    case LONG:
+    case LONG + INT:
+      type = long_type();
+      break;
+    default:
+      error_tok(tok, "invalid type");
+    }
+
+    tok = tok->next;
   }
-  if (match(rest, tok, TOKEN_CHAR)) {
-    return char_type();
-  }
-  if (match(rest, tok, TOKEN_SHORT)) {
-    return short_type();
-  }
-  if (match(rest, tok, TOKEN_INT)) {
-    return int_type();
-  }
-  if (match(rest, tok, TOKEN_LONG)) {
-    return long_type();
-  }
-  if (match(rest, tok, TOKEN_STRUCT)) {
-    return struct_decl(rest, tok->next);
-  }
-  if (match(rest, tok, TOKEN_UNION)) {
-    return union_decl(rest, tok->next);
-  }
-  error_tok(tok, "typename expected");
-  return NULL;
+
+  *rest = tok;
+  return type;
 }
 
 // func-params = (param ("," param)*)? ")"
@@ -281,8 +350,7 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
       tok = consume(tok, TOKEN_COMMA);
 
     Type *type = declarator(&tok, tok, base_type);
-    if (type->kind == TYPE_VOID)
-    {
+    if (type->kind == TYPE_VOID) {
       error_tok(tok, "variable declared void");
     }
     Obj *var = new_lvar(type, get_ident(type->name), type->name->len);
@@ -303,18 +371,17 @@ static BlockNode *declaration(const Token **rest, const Token *tok) {
 
 // Returns true if a given token represents a type.
 static bool is_typename(const Token *tok) {
-  switch(tok->kind)
-  {
-    case TOKEN_VOID:
-    case TOKEN_CHAR:
-    case TOKEN_SHORT:
-    case TOKEN_INT:
-    case TOKEN_LONG:
-    case TOKEN_STRUCT:
-    case TOKEN_UNION:
-      return true;
-    default:
-      return false;
+  switch (tok->kind) {
+  case TOKEN_VOID:
+  case TOKEN_CHAR:
+  case TOKEN_SHORT:
+  case TOKEN_INT:
+  case TOKEN_LONG:
+  case TOKEN_STRUCT:
+  case TOKEN_UNION:
+    return true;
+  default:
+    return false;
   }
 }
 
