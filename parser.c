@@ -258,6 +258,7 @@ static Type *declspec(const Token **rest, const Token *tok) {
       break;
     case LONG:
     case LONG + INT:
+    case LONG + LONG:
       type = long_type();
       break;
     default:
