@@ -1,13 +1,13 @@
 #ifndef OBJECT_HEADER_GUARD
 #define OBJECT_HEADER_GUARD
-
+#include <stddef.h>
 
 // Variable or function
 typedef struct Obj Obj;
 struct Obj {
   Obj *next;
   char *name; // Variable name
-  int name_length;  // Variable name length
+  size_t name_length;  // Variable name length
   struct Type *type;       // Type
   bool is_local;    // local or global/function
 

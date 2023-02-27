@@ -21,7 +21,8 @@ static const char *tokens_strings[TOKEN_TOTAL_COUNT] = {
     [TOKEN_SIZEOF] = "sizeof",
     [TOKEN_STRUCT] = "struct",
     [TOKEN_UNION] = "union",
-    [TOKEN_KEYWORDS_COUNT] = "13",
+    [TOKEN_TYPEDEF] = "typedef",
+    [TOKEN_KEYWORDS_COUNT] = "14",
     [TOKEN_LEFT_BRACKET] = "[",
     [TOKEN_RIGHT_BRACKET] = "]",
     [TOKEN_LEFT_PAREN] = "(",
@@ -115,11 +116,10 @@ void error_tok(const Token *tok, const char *fmt, ...) {
   verror_at(tok->line_no, tok->loc, fmt, ap);
 }
 
-// Ensure that the current token is `op`.
-bool equal(const Token *tok, const char *op) {
-  const int op_len = strlen(op);
-  const int min_len = op_len < tok->len ? op_len : tok->len;
-  return memcmp(tok->loc, op, min_len) == 0 && op[min_len] == '\0';
+// Ensure that the current token is `str`.
+bool equal(const Token *tok, const char *cstr , size_t cstr_len) {
+  const size_t min_len = cstr_len < tok->len ? cstr_len : tok->len;
+  return memcmp(tok->loc, cstr, min_len) == 0 && cstr[min_len] == '\0';
 }
 
 // Consumes the current token if it matches `op`.
@@ -264,7 +264,7 @@ static int read_punct(const char *p, TokenKind *kind) {
 
 static bool find_keyword(Token *tok, TokenKind *kind) {
   for (int i = 0; i < TOKEN_KEYWORDS_COUNT; i++)
-    if (equal(tok, tokens_strings[i])) {
+    if (equal(tok, tokens_strings[i],strlen(tokens_strings[i]))) {
       *kind = i;
       return true;
     }

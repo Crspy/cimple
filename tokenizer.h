@@ -20,6 +20,7 @@ typedef enum {
   TOKEN_SIZEOF,
   TOKEN_STRUCT,
   TOKEN_UNION,
+  TOKEN_TYPEDEF,
   TOKEN_KEYWORDS_COUNT,
 
   // Single-character tokens.
@@ -68,7 +69,7 @@ struct Token {
   Token *next;       // Next token
   int64_t val;           // If kind is TOKEN_NUM, its value
   const char *loc;   // Token location
-  int len;           // Token length
+  size_t len;           // Token length
   struct Type *type; // Used if TOKENK_STR
   char *str;         // String literal contents including terminating '\0'
 
@@ -80,7 +81,7 @@ const char *token_to_str(TokenKind c);
 void error(const char *fmt, ...);
 void error_at(const char *loc, const char *fmt, ...);
 void error_tok(const Token *tok, const char *fmt, ...);
-bool equal(const Token *tok, const char *op);
+bool equal(const Token *tok, const char *str, size_t str_len);
 Token *consume(const Token *tok, TokenKind kind);
 bool check(const Token *tok, TokenKind kind);
 bool match(const Token **rest, const Token *tok, TokenKind kind);
