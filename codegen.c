@@ -186,25 +186,38 @@ static void gen_expr(Node *node) {
     gen_expr(binary->lhs);
     pop("%rdi");
 
+    const char *ax_reg, *di_reg;
+
+    if (binary->lhs->type->kind == TYPE_LONG || binary->lhs->type->base) {
+      ax_reg = "%rax";
+      di_reg = "%rdi";
+    } else {
+      ax_reg = "%eax";
+      di_reg = "%edi";
+    }
+
     switch (binary->kind) {
     case NODE_ADD:
-      emitln("\tadd %%rdi, %%rax");
+      emitln("\tadd %s, %s", di_reg, ax_reg);
       return;
     case NODE_SUB:
-      emitln("\tsub %%rdi, %%rax");
+      emitln("\tsub %s, %s", di_reg, ax_reg);
       return;
     case NODE_MUL:
-      emitln("\timul %%rdi, %%rax");
+      emitln("\timul %s, %s", di_reg, ax_reg);
       return;
     case NODE_DIV:
-      emitln("\tcqo\n");
-      emitln("\tidiv %%rdi");
+      if (binary->lhs->type->size == 8)
+        emitln("\tcqo");
+      else
+        emitln("\tcdq");
+      emitln("\tidiv %s",di_reg);
       return;
     case NODE_EQ:
     case NODE_NE:
     case NODE_LT:
     case NODE_LE:
-      emitln("\tcmp %%rdi, %%rax");
+      emitln("\tcmp %s, %s", di_reg, ax_reg);
 
       if (binary->kind == NODE_EQ)
         emitln("\tsete %%al");
