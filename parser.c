@@ -5,7 +5,8 @@
 
 // Scope for struct or union tags
 typedef struct TagScope TagScope;
-struct TagScope {
+struct TagScope
+{
   TagScope *next;
   const Token *name;
   Type *type;
@@ -13,7 +14,8 @@ struct TagScope {
 
 // Scope for local, global variables or typedefs
 typedef struct VarScope VarScope;
-struct VarScope {
+struct VarScope
+{
   VarScope *next;
   char *name;
   size_t name_len;
@@ -23,7 +25,8 @@ struct VarScope {
 
 // Represents a block scope.
 typedef struct Scope Scope;
-struct Scope {
+struct Scope
+{
   Scope *next;
 
   // C has two block scopes; one is for variables and the other is
@@ -33,7 +36,8 @@ struct Scope {
 };
 
 // Variable attributes such as typedef or extern.
-typedef struct {
+typedef struct
+{
   bool is_typedef;
 } VarAttr;
 
@@ -62,28 +66,33 @@ static Node *equality(const Token **rest, const Token *tok);
 static Node *comparison(const Token **rest, const Token *tok);
 static Node *term(const Token **rest, const Token *tok);
 static Node *factor(const Token **rest, const Token *tok);
+static Node *cast(const Token **rest, const Token *tok);
 static Node *postfix(const Token **rest, const Token *tok);
 static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 static const Token *parse_typedef(const Token *tok, Type *base_type);
 
-static void enter_scope(void) {
+static void enter_scope(void)
+{
   Scope *sc = calloc(1, sizeof(Scope));
   sc->next = scopes;
   scopes = sc;
 }
 
-static void free_scope(Scope *scope) {
+static void free_scope(Scope *scope)
+{
   // free Var scopes
   VarScope *var_scope = scope->vars;
-  while (var_scope) {
+  while (var_scope)
+  {
     VarScope *dead_var_scope = var_scope;
     var_scope = var_scope->next;
     free(dead_var_scope);
   }
   // free tag scopes
   TagScope *tag_scope = scope->tags;
-  while (tag_scope) {
+  while (tag_scope)
+  {
     TagScope *dead_var_scope = tag_scope;
     tag_scope = tag_scope->next;
     free(dead_var_scope);
@@ -91,16 +100,20 @@ static void free_scope(Scope *scope) {
   free(scope);
 }
 
-static void leave_scope(void) {
+static void leave_scope(void)
+{
   Scope *dead_scope = scopes;
   scopes = scopes->next;
   free_scope(dead_scope);
 }
 
 // Find a variable by name.
-static VarScope *find_var(const Token *tok) {
-  for (Scope *sc = scopes; sc; sc = sc->next) {
-    for (VarScope *vsc = sc->vars; vsc; vsc = vsc->next) {
+static VarScope *find_var(const Token *tok)
+{
+  for (Scope *sc = scopes; sc; sc = sc->next)
+  {
+    for (VarScope *vsc = sc->vars; vsc; vsc = vsc->next)
+    {
       if (equal(tok, vsc->name, vsc->name_len))
         return vsc;
     }
@@ -108,7 +121,8 @@ static VarScope *find_var(const Token *tok) {
   return NULL;
 }
 
-static Type *find_tag(const Token *tok) {
+static Type *find_tag(const Token *tok)
+{
   for (Scope *sc = scopes; sc; sc = sc->next)
     for (TagScope *tag_sc = sc->tags; tag_sc; tag_sc = tag_sc->next)
       if (tok->len == tag_sc->name->len &&
@@ -117,7 +131,8 @@ static Type *find_tag(const Token *tok) {
   return NULL;
 }
 
-static void push_tag_scope(const Token *tok, Type *type) {
+static void push_tag_scope(const Token *tok, Type *type)
+{
   TagScope *sc = calloc(1, sizeof(TagScope));
   sc->name = tok;
   sc->type = type;
@@ -125,7 +140,8 @@ static void push_tag_scope(const Token *tok, Type *type) {
   scopes->tags = sc;
 }
 
-static VarScope *push_scope(char *name, size_t name_len) {
+static VarScope *push_scope(char *name, size_t name_len)
+{
   VarScope *sc = calloc(1, sizeof(VarScope));
   sc->name = name;
   sc->name_len = name_len;
@@ -134,7 +150,8 @@ static VarScope *push_scope(char *name, size_t name_len) {
   return sc;
 }
 
-static Obj *new_var(Type *type, char *name, size_t len) {
+static Obj *new_var(Type *type, char *name, size_t len)
+{
   Obj *var = calloc(1, sizeof(Obj));
   var->name = name;
   var->name_length = len;
@@ -143,44 +160,53 @@ static Obj *new_var(Type *type, char *name, size_t len) {
   return var;
 }
 
-static Obj *new_lvar(Type *type, char *name, size_t name_len) {
+static Obj *new_lvar(Type *type, char *name, size_t name_len)
+{
   Obj *var = new_var(type, name, name_len);
   var->is_local = true;
   var->next = locals;
   locals = var;
   return var;
 }
-static Obj *new_gvar(Type *type, char *name, size_t name_len) {
+static Obj *new_gvar(Type *type, char *name, size_t name_len)
+{
   Obj *var = new_var(type, name, name_len);
   var->next = globals;
   globals = var;
   return var;
 }
 
-static char *new_unique_name() {
+static char *new_unique_name()
+{
   static int id = 0;
   return format(".L..%d", id++);
 }
 
-static Obj *new_anon_gvar(Type *type) {
+static Obj *new_anon_gvar(Type *type)
+{
   char *unique_name = new_unique_name();
   return new_gvar(type, unique_name, strlen(unique_name));
 }
-static Obj *new_string_literal(char *str, Type *type) {
+static Obj *new_string_literal(char *str, Type *type)
+{
   Obj *var = new_anon_gvar(type);
   var->init_data = str;
   return var;
 }
 
-static char *get_ident(const Token *tok) {
-  if (tok->kind != TOKEN_IDENT) {
+static char *get_ident(const Token *tok)
+{
+  if (tok->kind != TOKEN_IDENT)
+  {
     error_tok(tok, "expected an identifier");
   }
   return strndup(tok->loc, tok->len);
 }
 
-static Type *find_typedef(const Token *tok) {
-  if (check(tok, TOKEN_IDENT)) {
+static Type *find_typedef(const Token *tok)
+{
+  if (check(tok, TOKEN_IDENT))
+  {
     VarScope *sc = find_var(tok);
     if (sc)
       return sc->type_def;
@@ -188,8 +214,10 @@ static Type *find_typedef(const Token *tok) {
   return NULL;
 }
 
-static int64_t get_number(const Token *tok) {
-  if (tok->kind != TOKEN_NUM) {
+static int64_t get_number(const Token *tok)
+{
+  if (tok->kind != TOKEN_NUM)
+  {
     error_tok(tok, "expected a number");
   }
   return tok->val;
@@ -210,12 +238,14 @@ static int64_t get_number(const Token *tok) {
 // while keeping the "current" type object that the typenames up
 // until that point represent. When we reach a non-typename token,
 // we returns the current type object.
-static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
+static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
+{
   // We use a single integer as counters for all typenames.
   // For example, bits 0 and 1 represents how many times we saw the
   // keyword "void" so far. With this, we can use a switch statement
   // as you can see below.
-  enum {
+  enum
+  {
     VOID = 1 << 0,
     CHAR = 1 << 2,
     SHORT = 1 << 4,
@@ -227,11 +257,14 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
   Type *type = int_type();
   int counter = 0;
 
-  while (is_typename(tok)) {
+  while (is_typename(tok))
+  {
 
     // Handle "typedef" keyword
-    if (check(tok, TOKEN_TYPEDEF)) {
-      if (!attr) {
+    if (check(tok, TOKEN_TYPEDEF))
+    {
+      if (!attr)
+      {
         error_tok(tok,
                   "storage class specifier is not allowed in this context");
       }
@@ -242,16 +275,22 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
 
     // Handle user-defined types.
     Type *type_def = find_typedef(tok);
-    if (check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION) || type_def) {
+    if (check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION) || type_def)
+    {
 
       if (counter != 0)
         break;
 
-      if (check(tok, TOKEN_STRUCT)) {
+      if (check(tok, TOKEN_STRUCT))
+      {
         type = struct_decl(&tok, tok->next);
-      } else if (check(tok, TOKEN_UNION)) {
+      }
+      else if (check(tok, TOKEN_UNION))
+      {
         type = union_decl(&tok, tok->next);
-      } else { // if(type_def)
+      }
+      else
+      { // if(type_def)
         type = type_def;
         tok = tok->next;
       }
@@ -261,7 +300,8 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
     }
 
     // Handle built-in types.
-    switch (tok->kind) {
+    switch (tok->kind)
+    {
     case TOKEN_VOID:
       counter += VOID;
       break;
@@ -281,7 +321,8 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
       unreachable();
     }
 
-    switch (counter) {
+    switch (counter)
+    {
     case VOID:
       type = void_type();
       break;
@@ -314,12 +355,15 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr) {
 // func-params = (param ("," param)*)? ")"
 // param       = declspec declarator
 static Type *func_params(const Token **rest, const Token *tok,
-                         Type *return_type) {
+                         Type *return_type)
+{
   Type head = {0};
   Type *cur = &head;
 
-  while (!check(tok, TOKEN_RIGHT_PAREN)) {
-    if (cur != &head) {
+  while (!check(tok, TOKEN_RIGHT_PAREN))
+  {
+    if (cur != &head)
+    {
       tok = consume(tok, TOKEN_COMMA);
     }
 
@@ -337,11 +381,13 @@ static Type *func_params(const Token **rest, const Token *tok,
 // type-suffix = "(" func-params
 //             | "[" num "]" type-suffix
 //             | ε
-static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
+static Type *type_suffix(const Token **rest, const Token *tok, Type *type)
+{
   if (match(&tok, tok, TOKEN_LEFT_PAREN))
     return func_params(rest, tok, type);
 
-  if (match(&tok, tok, TOKEN_LEFT_BRACKET)) {
+  if (match(&tok, tok, TOKEN_LEFT_BRACKET))
+  {
     int array_count = get_number(tok);
     tok = consume(tok, TOKEN_NUM);
     tok = consume(tok, TOKEN_RIGHT_BRACKET);
@@ -354,12 +400,15 @@ static Type *type_suffix(const Token **rest, const Token *tok, Type *type) {
 }
 
 // declarator = "*"* ( ident | "(" ident ")" | "(" declarator ")" ) type-suffix
-static Type *declarator(const Token **rest, const Token *tok, Type *type) {
-  while (match(&tok, tok, TOKEN_STAR)) {
+static Type *declarator(const Token **rest, const Token *tok, Type *type)
+{
+  while (match(&tok, tok, TOKEN_STAR))
+  {
     type = pointer_to(type);
   }
 
-  if (match(&tok, tok, TOKEN_LEFT_PAREN)) {
+  if (match(&tok, tok, TOKEN_LEFT_PAREN))
+  {
     const Token *start = tok;
     Type dummy = {0};
     declarator(&tok, start, &dummy);
@@ -378,12 +427,15 @@ static Type *declarator(const Token **rest, const Token *tok, Type *type) {
 
 // abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix
 static Type *abstract_declarator(const Token **rest, const Token *tok,
-                                 Type *type) {
-  while (match(&tok, tok, TOKEN_STAR)) {
+                                 Type *type)
+{
+  while (match(&tok, tok, TOKEN_STAR))
+  {
     type = pointer_to(type);
   }
 
-  if (match(&tok, tok, TOKEN_LEFT_PAREN)) {
+  if (match(&tok, tok, TOKEN_LEFT_PAREN))
+  {
     const Token *start = tok;
     Type dummy = {0};
     abstract_declarator(&tok, start, &dummy);
@@ -396,7 +448,8 @@ static Type *abstract_declarator(const Token **rest, const Token *tok,
 }
 
 // type-name = declspec abstract-declarator
-static Type *typename(const Token **rest, const Token *tok) {
+static Type *typename(const Token **rest, const Token *tok)
+{
   Type *type = declspec(&tok, tok, NULL);
   return abstract_declarator(rest, tok, type);
 }
@@ -404,18 +457,21 @@ static Type *typename(const Token **rest, const Token *tok) {
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
 // expr)?)*)? ";"
 static BlockNode *declaration(const Token **rest, const Token *tok,
-                              Type *base_type) {
+                              Type *base_type)
+{
 
   Node head = {0};
   Node *cur = &head;
   int i = 0;
 
-  while (!check(tok, TOKEN_SEMICOLON)) {
+  while (!check(tok, TOKEN_SEMICOLON))
+  {
     if (i++ > 0)
       tok = consume(tok, TOKEN_COMMA);
 
     Type *type = declarator(&tok, tok, base_type);
-    if (type->kind == TYPE_VOID) {
+    if (type->kind == TYPE_VOID)
+    {
       error_tok(tok, "variable declared void");
     }
     Obj *var = new_lvar(type, get_ident(type->name), type->name->len);
@@ -435,8 +491,10 @@ static BlockNode *declaration(const Token **rest, const Token *tok,
 }
 
 // Returns true if a given token represents a type.
-static bool is_typename(const Token *tok) {
-  switch (tok->kind) {
+static bool is_typename(const Token *tok)
+{
+  switch (tok->kind)
+  {
   case TOKEN_VOID:
   case TOKEN_CHAR:
   case TOKEN_SHORT:
@@ -457,23 +515,29 @@ static bool is_typename(const Token *tok) {
 //      | "while" "(" expr ")" stmt
 //      | "{" compound-stmt
 //      | expr-stmt
-static Node *stmt(const Token **rest, const Token *tok) {
-  if (check(tok, TOKEN_RETURN)) {
+static Node *stmt(const Token **rest, const Token *tok)
+{
+  if (check(tok, TOKEN_RETURN))
+  {
     Node *node = new_unary_node(NODE_RETURN, expr(&tok, tok->next), tok);
     *rest = consume(tok, TOKEN_SEMICOLON);
     return node;
   }
 
-  if (check(tok, TOKEN_IF)) {
+  if (check(tok, TOKEN_IF))
+  {
     const Token *start = tok;
     tok = consume(tok->next, TOKEN_LEFT_PAREN);
     Node *cond_expr = expr(&tok, tok);
     tok = consume(tok, TOKEN_RIGHT_PAREN);
     Node *then_stmt = stmt(&tok, tok);
     Node *else_stmt;
-    if (check(tok, TOKEN_ELSE)) {
+    if (check(tok, TOKEN_ELSE))
+    {
       else_stmt = stmt(&tok, tok->next);
-    } else {
+    }
+    else
+    {
       else_stmt = NULL;
     }
 
@@ -482,7 +546,8 @@ static Node *stmt(const Token **rest, const Token *tok) {
     *rest = tok;
     return node;
   }
-  if (check(tok, TOKEN_FOR)) {
+  if (check(tok, TOKEN_FOR))
+  {
     const Token *start = tok;
 
     tok = consume(tok->next, TOKEN_LEFT_PAREN);
@@ -508,7 +573,8 @@ static Node *stmt(const Token **rest, const Token *tok) {
     Node *node = new_for_node(init_expr, cond_expr, inc_expr, body_stmt, start);
     return node;
   }
-  if (check(tok, TOKEN_WHILE)) {
+  if (check(tok, TOKEN_WHILE))
+  {
     const Token *start = tok;
 
     tok = consume(tok->next, TOKEN_LEFT_PAREN);
@@ -520,7 +586,8 @@ static Node *stmt(const Token **rest, const Token *tok) {
     return node;
   }
 
-  if (match(&tok, tok, TOKEN_LEFT_BRACE)) {
+  if (match(&tok, tok, TOKEN_LEFT_BRACE))
+  {
     return (Node *)compound_stmt(rest, tok);
   }
 
@@ -528,24 +595,29 @@ static Node *stmt(const Token **rest, const Token *tok) {
 }
 
 // compound-stmt = (typedef | declaration | stmt)* "}"
-static BlockNode *compound_stmt(const Token **rest, const Token *tok) {
+static BlockNode *compound_stmt(const Token **rest, const Token *tok)
+{
   Node head = {0};
   Node *cur = &head;
 
   enter_scope();
 
-  while (!check(tok, TOKEN_RIGHT_BRACE)) {
-    if (is_typename(tok)) {
+  while (!check(tok, TOKEN_RIGHT_BRACE))
+  {
+    if (is_typename(tok))
+    {
       VarAttr attr = {0};
       Type *base_type = declspec(&tok, tok, &attr);
-      if (attr.is_typedef) {
+      if (attr.is_typedef)
+      {
         tok = parse_typedef(tok, base_type);
         continue;
       }
 
       cur = cur->next = (Node *)declaration(&tok, tok, base_type);
-
-    } else {
+    }
+    else
+    {
       cur = cur->next = stmt(&tok, tok);
     }
 
@@ -560,8 +632,10 @@ static BlockNode *compound_stmt(const Token **rest, const Token *tok) {
 }
 
 // expr-stmt = expr? ";"
-static Node *expr_stmt(const Token **rest, const Token *tok) {
-  if (match(rest, tok, TOKEN_SEMICOLON)) {
+static Node *expr_stmt(const Token **rest, const Token *tok)
+{
+  if (match(rest, tok, TOKEN_SEMICOLON))
+  {
     // empty expression
     return (Node *)new_block_node(NULL, tok);
   }
@@ -574,7 +648,8 @@ static Node *expr_stmt(const Token **rest, const Token *tok) {
 }
 
 // expr = assign ("," expr)?
-static Node *expr(const Token **rest, const Token *tok) {
+static Node *expr(const Token **rest, const Token *tok)
+{
   Node *node = assign(&tok, tok);
 
   if (check(tok, TOKEN_COMMA))
@@ -585,7 +660,8 @@ static Node *expr(const Token **rest, const Token *tok) {
 }
 
 // assign = equality ("=" assign)?
-static Node *assign(const Token **rest, const Token *tok) {
+static Node *assign(const Token **rest, const Token *tok)
+{
   Node *node = equality(&tok, tok);
   if (check(tok, TOKEN_EQUAL))
     return new_binary_node(NODE_ASSIGN, node, assign(rest, tok->next), tok);
@@ -594,17 +670,21 @@ static Node *assign(const Token **rest, const Token *tok) {
 }
 
 // equality = comparison ("==" comparison | "!=" comparison)*
-static Node *equality(const Token **rest, const Token *tok) {
+static Node *equality(const Token **rest, const Token *tok)
+{
   Node *node = comparison(&tok, tok);
 
-  for (;;) {
+  for (;;)
+  {
     const Token *start = tok;
-    if (check(tok, TOKEN_EQUAL_EQUAL)) {
+    if (check(tok, TOKEN_EQUAL_EQUAL))
+    {
       node = new_binary_node(NODE_EQ, node, comparison(&tok, tok->next), start);
       continue;
     }
 
-    if (check(tok, TOKEN_BANG_EQUAL)) {
+    if (check(tok, TOKEN_BANG_EQUAL))
+    {
       node = new_binary_node(NODE_NE, node, comparison(&tok, tok->next), start);
       continue;
     }
@@ -615,27 +695,33 @@ static Node *equality(const Token **rest, const Token *tok) {
 }
 
 // comparison = term ("<" term | "<=" term | ">" term | ">=" term)*
-static Node *comparison(const Token **rest, const Token *tok) {
+static Node *comparison(const Token **rest, const Token *tok)
+{
   Node *node = term(&tok, tok);
 
-  for (;;) {
+  for (;;)
+  {
     const Token *start = tok;
-    if (check(tok, TOKEN_LESS)) {
+    if (check(tok, TOKEN_LESS))
+    {
       node = new_binary_node(NODE_LT, node, term(&tok, tok->next), start);
       continue;
     }
 
-    if (check(tok, TOKEN_LESS_EQUAL)) {
+    if (check(tok, TOKEN_LESS_EQUAL))
+    {
       node = new_binary_node(NODE_LE, node, term(&tok, tok->next), start);
       continue;
     }
 
-    if (check(tok, TOKEN_GREATER)) {
+    if (check(tok, TOKEN_GREATER))
+    {
       node = new_binary_node(NODE_LT, term(&tok, tok->next), node, start);
       continue;
     }
 
-    if (check(tok, TOKEN_GREATER_EQUAL)) {
+    if (check(tok, TOKEN_GREATER_EQUAL))
+    {
       node = new_binary_node(NODE_LE, term(&tok, tok->next), node, start);
       continue;
     }
@@ -650,7 +736,8 @@ static Node *comparison(const Token **rest, const Token *tok) {
 // so that p+n points to the location n elements (not bytes) ahead of p.
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
-static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
+static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
+{
   add_type(lhs);
   add_type(rhs);
 
@@ -662,7 +749,8 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
     error_tok(tok, "invalid operands");
 
   // Canonicalize `num + ptr` to `ptr + num`.
-  if (!lhs->type->base && rhs->type->base) {
+  if (!lhs->type->base && rhs->type->base)
+  {
     Node *tmp = lhs;
     lhs = rhs;
     rhs = tmp;
@@ -675,7 +763,8 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok) {
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
-static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
+static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
+{
   add_type(lhs);
   add_type(rhs);
 
@@ -684,7 +773,8 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
     return new_binary_node(NODE_SUB, lhs, rhs, tok);
 
   // ptr - num
-  if (lhs->type->base && is_integer(rhs->type)) {
+  if (lhs->type->base && is_integer(rhs->type))
+  {
     rhs =
         new_binary_node(NODE_MUL, rhs, new_num_node(lhs->type->base->size, tok),
                         tok); // TODO: make this a right left (<<) by n instead
@@ -695,7 +785,8 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
   }
 
   // ptr - ptr, which returns how many elements are between the two.
-  if (lhs->type->base && rhs->type->base) {
+  if (lhs->type->base && rhs->type->base)
+  {
     Node *node = new_binary_node(NODE_SUB, lhs, rhs, tok);
     node->type = int_type();
 
@@ -709,18 +800,22 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok) {
 }
 
 // term = factor ("+" factor | "-" factor)*
-static Node *term(const Token **rest, const Token *tok) {
+static Node *term(const Token **rest, const Token *tok)
+{
   Node *node = factor(&tok, tok);
 
-  for (;;) {
+  for (;;)
+  {
     const Token *start = tok;
 
-    if (check(tok, TOKEN_PLUS)) {
+    if (check(tok, TOKEN_PLUS))
+    {
       node = new_add(node, factor(&tok, tok->next), start);
       continue;
     }
 
-    if (check(tok, TOKEN_MINUS)) {
+    if (check(tok, TOKEN_MINUS))
+    {
       node = new_sub(node, factor(&tok, tok->next), start);
       continue;
     }
@@ -730,19 +825,23 @@ static Node *term(const Token **rest, const Token *tok) {
   }
 }
 
-// factor = unary ("*" unary | "/" unary)*
-static Node *factor(const Token **rest, const Token *tok) {
-  Node *node = unary(&tok, tok);
+// factor = cast ("*" cast | "/" cast)*
+static Node *factor(const Token **rest, const Token *tok)
+{
+  Node *node = cast(&tok, tok);
 
-  for (;;) {
+  for (;;)
+  {
     const Token *start = tok;
-    if (check(tok, TOKEN_STAR)) {
-      node = new_binary_node(NODE_MUL, node, unary(&tok, tok->next), start);
+    if (check(tok, TOKEN_STAR))
+    {
+      node = new_binary_node(NODE_MUL, node, cast(&tok, tok->next), start);
       continue;
     }
 
-    if (check(tok, TOKEN_SLASH)) {
-      node = new_binary_node(NODE_DIV, node, unary(&tok, tok->next), start);
+    if (check(tok, TOKEN_SLASH))
+    {
+      node = new_binary_node(NODE_DIV, node, cast(&tok, tok->next), start);
       continue;
     }
 
@@ -751,31 +850,57 @@ static Node *factor(const Token **rest, const Token *tok) {
   }
 }
 
-// unary = ("+" | "-" | "*" | "&") unary
+
+
+// cast = "(" type-name ")" cast | unary
+static Node *cast(const Token **rest, const Token *tok)
+{
+  if (check(tok, TOKEN_LEFT_PAREN) && is_typename(tok->next))
+  {
+    const Token *start = tok;
+    Type *type = typename(&tok, tok->next);
+    tok = consume(tok, TOKEN_RIGHT_PAREN);
+
+    Node* expr = cast(rest, tok);
+    add_type(expr);
+    Node *node = new_unary_node(NODE_CAST, expr, start);
+    node->type = type;
+
+    return node;
+  }
+
+  return unary(rest, tok);
+}
+
+// unary = ("+" | "-" | "*" | "&") cast
 //       | postfix
-static Node *unary(const Token **rest, const Token *tok) {
+static Node *unary(const Token **rest, const Token *tok)
+{
   if (check(tok, TOKEN_PLUS))
-    return unary(rest, tok->next);
+    return cast(rest, tok->next);
 
   if (check(tok, TOKEN_MINUS))
-    return new_unary_node(NODE_NEG, unary(rest, tok->next), tok);
+    return new_unary_node(NODE_NEG, cast(rest, tok->next), tok);
   if (check(tok, TOKEN_AMPERSAND))
-    return new_unary_node(NODE_ADDR, unary(rest, tok->next), tok);
+    return new_unary_node(NODE_ADDR, cast(rest, tok->next), tok);
   if (check(tok, TOKEN_STAR))
-    return new_unary_node(NODE_DEREF, unary(rest, tok->next), tok);
+    return new_unary_node(NODE_DEREF, cast(rest, tok->next), tok);
 
   return postfix(rest, tok);
 }
 
 // struct-members = (declspec declarator (","  declarator)* ";")*
-static Member *struct_union_members(const Token **rest, const Token *tok) {
+static Member *struct_union_members(const Token **rest, const Token *tok)
+{
   Member head = {0};
   Member *cur = &head;
-  while (!check(tok, TOKEN_RIGHT_BRACE)) {
+  while (!check(tok, TOKEN_RIGHT_BRACE))
+  {
     Type *base_type = declspec(&tok, tok, NULL);
     int i = 0;
 
-    while (!match(&tok, tok, TOKEN_SEMICOLON)) {
+    while (!match(&tok, tok, TOKEN_SEMICOLON))
+    {
       if (i++)
         tok = consume(tok, TOKEN_COMMA);
 
@@ -788,15 +913,18 @@ static Member *struct_union_members(const Token **rest, const Token *tok) {
   return head.next;
 }
 
-static Type *union_decl(const Token **rest, const Token *tok) {
+static Type *union_decl(const Token **rest, const Token *tok)
+{
   // Read a union tag
   const Token *tag = NULL;
-  if (check(tok, TOKEN_IDENT)) {
+  if (check(tok, TOKEN_IDENT))
+  {
     tag = tok;
     tok = tok->next;
   }
 
-  if (tag && !check(tok, TOKEN_LEFT_BRACE)) {
+  if (tag && !check(tok, TOKEN_LEFT_BRACE))
+  {
     Type *type = find_tag(tag);
     if (!type)
       error_tok(tag, "unknown union type");
@@ -811,7 +939,8 @@ static Type *union_decl(const Token **rest, const Token *tok) {
   // If union, we don't have to assign offsets because they
   // are already initialized to zero. We need to compute the
   // alignment and the size though.
-  for (Member *mem = members; mem; mem = mem->next) {
+  for (Member *mem = members; mem; mem = mem->next)
+  {
     if (union_align < mem->type->align)
       union_align = mem->type->align;
     if (union_size < mem->type->size)
@@ -825,15 +954,18 @@ static Type *union_decl(const Token **rest, const Token *tok) {
   return union_type;
 }
 
-static Type *struct_decl(const Token **rest, const Token *tok) {
+static Type *struct_decl(const Token **rest, const Token *tok)
+{
   // Read a struct tag.
   const Token *tag = NULL;
-  if (check(tok, TOKEN_IDENT)) {
+  if (check(tok, TOKEN_IDENT))
+  {
     tag = tok;
     tok = tok->next;
   }
 
-  if (tag && !check(tok, TOKEN_LEFT_BRACE)) {
+  if (tag && !check(tok, TOKEN_LEFT_BRACE))
+  {
     Type *type = find_tag(tag);
     if (!type)
       error_tok(tag, "unknown struct type");
@@ -845,12 +977,14 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
   size_t struct_align = 1;
   // Assign offsets within the struct to members.
   size_t offset = 0;
-  for (Member *mem = members; mem; mem = mem->next) {
+  for (Member *mem = members; mem; mem = mem->next)
+  {
     offset = align_to(offset, mem->type->align);
     mem->offset = offset;
     offset += mem->type->size;
 
-    if (struct_align < mem->type->align) {
+    if (struct_align < mem->type->align)
+    {
       struct_align = mem->type->align;
     }
   }
@@ -862,10 +996,13 @@ static Type *struct_decl(const Token **rest, const Token *tok) {
   return struct_type;
 }
 
-static Member *get_struct_union_member(Type *type, const Token *tok) {
-  for (Member *mem = type->members; mem; mem = mem->next) {
+static Member *get_struct_union_member(Type *type, const Token *tok)
+{
+  for (Member *mem = type->members; mem; mem = mem->next)
+  {
     if (mem->name->len == tok->len &&
-        strncmp(mem->name->loc, tok->loc, tok->len) == 0) {
+        strncmp(mem->name->loc, tok->loc, tok->len) == 0)
+    {
       return mem;
     }
   }
@@ -873,10 +1010,12 @@ static Member *get_struct_union_member(Type *type, const Token *tok) {
   return NULL;
 }
 
-static Node *struct_union_ref(Node *lhs, const Token *tok) {
+static Node *struct_union_ref(Node *lhs, const Token *tok)
+{
   add_type(lhs);
 
-  if (lhs->type->kind != TYPE_STRUCT && lhs->type->kind != TYPE_UNION) {
+  if (lhs->type->kind != TYPE_STRUCT && lhs->type->kind != TYPE_UNION)
+  {
     error_tok(lhs->tok, "not a struct nor a union");
   }
 
@@ -885,11 +1024,14 @@ static Node *struct_union_ref(Node *lhs, const Token *tok) {
 }
 
 // postfix = primary ("[" expr "]" | "." ident | "->" ident)*
-static Node *postfix(const Token **rest, const Token *tok) {
+static Node *postfix(const Token **rest, const Token *tok)
+{
   Node *node = primary(&tok, tok);
 
-  for (;;) {
-    if (check(tok, TOKEN_LEFT_BRACKET)) {
+  for (;;)
+  {
+    if (check(tok, TOKEN_LEFT_BRACKET))
+    {
       // x[y] is short for *(x+y)
       const Token *start = tok;
       Node *idx = expr(&tok, tok->next);
@@ -898,14 +1040,16 @@ static Node *postfix(const Token **rest, const Token *tok) {
       continue;
     }
 
-    if (match(&tok, tok, TOKEN_DOT)) {
+    if (match(&tok, tok, TOKEN_DOT))
+    {
       node = struct_union_ref(node, tok);
       tok = consume(tok, TOKEN_IDENT);
       // tok = tok->next; // skip the "ident" after the "."
       continue;
     }
 
-    if (check(tok, TOKEN_ARROW)) {
+    if (check(tok, TOKEN_ARROW))
+    {
       // x->y is equivalent to  (*x).y
       node = new_unary_node(NODE_DEREF, node, tok);
       tok = consume(tok, TOKEN_ARROW);
@@ -921,14 +1065,16 @@ static Node *postfix(const Token **rest, const Token *tok) {
 }
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
-static Node *funcall(const Token **rest, const Token *tok) {
+static Node *funcall(const Token **rest, const Token *tok)
+{
   const Token *start = tok;
   tok = tok->next->next;
 
   Node head = {0};
   Node *cur = &head;
 
-  while (!check(tok, TOKEN_RIGHT_PAREN)) {
+  while (!check(tok, TOKEN_RIGHT_PAREN))
+  {
     if (cur != &head)
       tok = consume(tok, TOKEN_COMMA);
     cur = cur->next = assign(&tok, tok);
@@ -950,24 +1096,29 @@ static Node *funcall(const Token **rest, const Token *tok) {
 //         | ident func-args?
 //         | str
 //         | num
-static Node *primary(const Token **rest, const Token *tok) {
+static Node *primary(const Token **rest, const Token *tok)
+{
   const Token *start = tok;
 
-  if (check(tok, TOKEN_LEFT_PAREN) && check(tok->next, TOKEN_LEFT_BRACE)) {
+  if (check(tok, TOKEN_LEFT_PAREN) && check(tok->next, TOKEN_LEFT_BRACE))
+  {
     // This is a GNU statement expresssion.
 
     BlockNode *block_node = compound_stmt(&tok, tok->next->next);
     *rest = consume(tok, TOKEN_RIGHT_PAREN);
     return new_unary_node(NODE_STMT_EXPR, block_node->body, start);
   }
-  if (match(&tok, tok, TOKEN_LEFT_PAREN)) {
+  if (match(&tok, tok, TOKEN_LEFT_PAREN))
+  {
     Node *node = expr(&tok, tok);
     *rest = consume(tok, TOKEN_RIGHT_PAREN);
     return node;
   }
 
-  if (check(tok, TOKEN_SIZEOF)) {
-    if (check(tok->next, TOKEN_LEFT_PAREN) && is_typename(tok->next->next)) {
+  if (check(tok, TOKEN_SIZEOF))
+  {
+    if (check(tok->next, TOKEN_LEFT_PAREN) && is_typename(tok->next->next))
+    {
       // sizeof(typename)
       Type *type = typename(&tok, tok->next->next);
       *rest = consume(tok, TOKEN_RIGHT_PAREN);
@@ -978,27 +1129,32 @@ static Node *primary(const Token **rest, const Token *tok) {
     return new_num_node(node->type->size, tok);
   }
 
-  if (check(tok, TOKEN_IDENT)) {
+  if (check(tok, TOKEN_IDENT))
+  {
     // Function call
-    if (check(tok->next, TOKEN_LEFT_PAREN)) {
+    if (check(tok->next, TOKEN_LEFT_PAREN))
+    {
       return funcall(rest, tok);
     }
 
     const VarScope *var_scope = find_var(tok);
-    if (!var_scope || !var_scope->var) {
+    if (!var_scope || !var_scope->var)
+    {
       error_tok(tok, "undefined variable");
     }
     *rest = tok->next;
     return new_var_node(var_scope->var, tok);
   }
 
-  if (check(tok, TOKEN_STR)) {
+  if (check(tok, TOKEN_STR))
+  {
     Obj *var = new_string_literal(tok->str, tok->type);
     *rest = tok->next;
     return new_var_node(var, tok);
   }
 
-  if (check(tok, TOKEN_NUM)) {
+  if (check(tok, TOKEN_NUM))
+  {
     Node *node = new_num_node(tok->val, tok);
     *rest = tok->next;
     return node;
@@ -1007,11 +1163,14 @@ static Node *primary(const Token **rest, const Token *tok) {
   error_tok(tok, "expected an expression");
   return NULL;
 }
-static const Token *parse_typedef(const Token *tok, Type *base_type) {
+static const Token *parse_typedef(const Token *tok, Type *base_type)
+{
   bool first = true;
 
-  while (!match(&tok, tok, TOKEN_SEMICOLON)) {
-    if (!first) {
+  while (!match(&tok, tok, TOKEN_SEMICOLON))
+  {
+    if (!first)
+    {
       tok = consume(tok, TOKEN_COMMA);
     }
     first = false;
@@ -1023,14 +1182,17 @@ static const Token *parse_typedef(const Token *tok, Type *base_type) {
   }
   return tok;
 }
-static void create_param_lvars(Type *param) {
-  if (param) {
+static void create_param_lvars(Type *param)
+{
+  if (param)
+  {
     create_param_lvars(param->next);
     new_lvar(param, get_ident(param->name), param->name->len);
   }
 }
 
-static const Token *function(const Token *tok, Type *base_type) {
+static const Token *function(const Token *tok, Type *base_type)
+{
   Type *type = declarator(&tok, tok, base_type);
 
   Obj *fn = new_gvar(type, get_ident(type->name), type->name->len);
@@ -1051,11 +1213,14 @@ static const Token *function(const Token *tok, Type *base_type) {
   return tok;
 }
 
-static const Token *global_variable(const Token *tok, Type *base_type) {
+static const Token *global_variable(const Token *tok, Type *base_type)
+{
   bool first = true;
 
-  while (!match(&tok, tok, TOKEN_SEMICOLON)) {
-    if (!first) {
+  while (!match(&tok, tok, TOKEN_SEMICOLON))
+  {
+    if (!first)
+    {
       tok = consume(tok, TOKEN_COMMA);
     }
 
@@ -1069,8 +1234,10 @@ static const Token *global_variable(const Token *tok, Type *base_type) {
 
 // Lookahead tokens and returns true if a given token
 // is a start of a function definition or declaration
-static bool is_function(const Token *tok) {
-  if (check(tok, TOKEN_SEMICOLON)) {
+static bool is_function(const Token *tok)
+{
+  if (check(tok, TOKEN_SEMICOLON))
+  {
     return false;
   }
 
@@ -1080,21 +1247,25 @@ static bool is_function(const Token *tok) {
 }
 
 // program = (typedef | function-definition | global-variable)*
-Obj *parse(const Token *tok) {
+Obj *parse(const Token *tok)
+{
   globals = NULL;
 
-  while (!check(tok, TOKEN_EOF)) {
+  while (!check(tok, TOKEN_EOF))
+  {
     VarAttr attr = {0};
     Type *base_type = declspec(&tok, tok, &attr);
 
     // Typedef
-    if (attr.is_typedef) {
+    if (attr.is_typedef)
+    {
       tok = parse_typedef(tok, base_type);
       continue;
     }
 
     // Function
-    if (is_function(tok)) {
+    if (is_function(tok))
+    {
       tok = function(tok, base_type);
       continue;
     }

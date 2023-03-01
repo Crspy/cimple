@@ -13,7 +13,8 @@ static FILE *output_file;
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
 
-static void emitln(const char *fmt, ...) {
+static void emitln(const char *fmt, ...)
+{
   va_list ap;
   va_start(ap, fmt);
   vfprintf(output_file, fmt, ap);
@@ -21,17 +22,20 @@ static void emitln(const char *fmt, ...) {
   fputc('\n', output_file);
 }
 
-static int count(void) {
+static int count(void)
+{
   static int i = 1;
   return i++;
 }
 
-static void push(void) {
+static void push(void)
+{
   emitln("\tpush %%rax");
   depth++;
 }
 
-static void pop(char *arg) {
+static void pop(char *arg)
+{
   emitln("\tpop %s", arg);
   depth--;
 }
@@ -40,43 +44,55 @@ bool isPowerofTwo(int n) { return (n != 0) && ((n & (n - 1)) == 0); }
 
 // Round up `n` to the nearest multiple of `align` (where align is a power of 2)
 // For instance, align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
-int align_to(int n, int align) {
+int align_to(int n, int align)
+{
   assert(isPowerofTwo(align));
   return ((n - 1) & -align) + align;
 }
 
 // Compute the absolute address of a given node.
 // It's an error if a given node does not reside in memory.
-static void gen_addr(Node *node) {
-  switch (node->tag) {
-  case NODE_TAG_MEMBER: {
+static void gen_addr(Node *node)
+{
+  switch (node->tag)
+  {
+  case NODE_TAG_MEMBER:
+  {
     struct MemberNode *member_node = (struct MemberNode *)node;
     gen_addr(member_node->lhs);
     emitln("\tadd $%d, %%rax", member_node->member->offset);
     return;
   }
-  case NODE_TAG_VAR: {
+  case NODE_TAG_VAR:
+  {
     struct VarNode *var_node = (struct VarNode *)node;
-    if (var_node->var->is_local) {
+    if (var_node->var->is_local)
+    {
       // Local variable
       emitln("\tlea %d(%%rbp), %%rax", var_node->var->offset);
-    } else {
+    }
+    else
+    {
       // Global variable
       emitln("\tlea %s(%%rip), %%rax", var_node->var->name);
     }
     return;
   }
-  case NODE_TAG_UNARY: {
+  case NODE_TAG_UNARY:
+  {
     struct UnaryNode *unary = (struct UnaryNode *)node;
-    if (unary->kind == NODE_DEREF) {
+    if (unary->kind == NODE_DEREF)
+    {
       gen_expr(unary->expr);
       return;
     }
     break;
   }
-  case NODE_TAG_BINARY: {
+  case NODE_TAG_BINARY:
+  {
     struct BinaryNode *binary = (struct BinaryNode *)node;
-    if (binary->kind == NODE_COMMA) {
+    if (binary->kind == NODE_COMMA)
+    {
       gen_expr(binary->lhs);
       gen_addr(binary->rhs);
       return;
@@ -91,9 +107,11 @@ static void gen_addr(Node *node) {
 }
 
 // Load a value from where %rax is pointing to.
-static void load(Type *type) {
+static void load(Type *type)
+{
   if (type->kind == TYPE_ARRAY || type->kind == TYPE_STRUCT ||
-      type->kind == TYPE_UNION) {
+      type->kind == TYPE_UNION)
+  {
     // If it is an array/struct/union, do not attempt to load a value to the
     // register because in general we can't load an entire array to a
     // register. As a result, the result of an evaluation of an array
@@ -114,11 +132,14 @@ static void load(Type *type) {
 }
 
 // Store %rax to an address that the stack top is pointing to.
-static void store(Type *type) {
+static void store(Type *type)
+{
   pop("%rdi");
 
-  if (type->kind == TYPE_STRUCT || type->kind == TYPE_UNION) {
-    for (int i = 0; i < type->size; i++) {
+  if (type->kind == TYPE_STRUCT || type->kind == TYPE_UNION)
+  {
+    for (int i = 0; i < type->size; i++)
+    {
       // TODO: optimize this
       emitln("\tmov %d(%%rax), %%r8b", i);
       emitln("\tmov %%r8b, %d(%%rdi)", i);
@@ -136,14 +157,64 @@ static void store(Type *type) {
     emitln("\tmov %%rax, (%%rdi)");
 }
 
-static void gen_expr(Node *node) {
+static int getTypeId(Type *type)
+{
+  enum cast_table_id
+  {
+    I8,
+    I16,
+    I32,
+    I64
+  };
+
+  switch (type->kind)
+  {
+  case TYPE_CHAR:
+    return I8;
+  case TYPE_SHORT:
+    return I16;
+  case TYPE_INT:
+    return I32;
+  default:
+    return I64;
+  }
+}
+
+// The table for type casts
+static const char i32i8[] = "movsbl %al, %eax";
+static const char i32i16[] = "movswl %ax, %eax";
+static const char i32i64[] = "movsxd %eax, %rax";
+
+static const char *cast_table[4][4] = {
+    {NULL, NULL, NULL, i32i64},    // i8
+    {i32i8, NULL, NULL, i32i64},   // i16
+    {i32i8, i32i16, NULL, i32i64}, // i32
+    {i32i8, i32i16, NULL, NULL},   // i64
+};
+
+static void cast(Type *from, Type *to)
+{
+  if (to->kind == TYPE_VOID)
+    return;
+
+  int from_id = getTypeId(from);
+  int to_id = getTypeId(to);
+  if (cast_table[from_id][to_id])
+    emitln("\t%s", cast_table[from_id][to_id]);
+}
+
+static void gen_expr(Node *node)
+{
   emitln("\t.loc 1 %lu %lu", node->tok->line_no, node->tok->col_pos);
 
-  switch (node->tag) {
-  case NODE_TAG_UNARY: {
+  switch (node->tag)
+  {
+  case NODE_TAG_UNARY:
+  {
     struct UnaryNode *unary = (struct UnaryNode *)node;
 
-    switch (unary->kind) {
+    switch (unary->kind)
+    {
     case NODE_NEG:
       gen_expr(unary->expr);
       emitln("\tneg %%rax");
@@ -156,9 +227,14 @@ static void gen_expr(Node *node) {
       load(node->type);
       return;
     case NODE_STMT_EXPR:
-      for (Node *n = unary->expr; n; n = n->next) {
+      for (Node *n = unary->expr; n; n = n->next)
+      {
         gen_stmt(n);
       }
+      return;
+    case NODE_CAST:
+      gen_expr(unary->expr);
+      cast(unary->expr->type, node->type);
       return;
     default:
       break;
@@ -166,16 +242,20 @@ static void gen_expr(Node *node) {
 
     break;
   }
-  case NODE_TAG_BINARY: {
+  case NODE_TAG_BINARY:
+  {
     struct BinaryNode *binary = (struct BinaryNode *)node;
 
-    if (binary->kind == NODE_ASSIGN) {
+    if (binary->kind == NODE_ASSIGN)
+    {
       gen_addr(binary->lhs);
       push(); // push the address of the local variable
       gen_expr(binary->rhs);
       store(node->type);
       return;
-    } else if (binary->kind == NODE_COMMA) {
+    }
+    else if (binary->kind == NODE_COMMA)
+    {
       gen_expr(binary->lhs);
       gen_expr(binary->rhs);
       return;
@@ -188,15 +268,19 @@ static void gen_expr(Node *node) {
 
     const char *ax_reg, *di_reg;
 
-    if (binary->lhs->type->kind == TYPE_LONG || binary->lhs->type->base) {
+    if (binary->lhs->type->kind == TYPE_LONG || binary->lhs->type->base)
+    {
       ax_reg = "%rax";
       di_reg = "%rdi";
-    } else {
+    }
+    else
+    {
       ax_reg = "%eax";
       di_reg = "%edi";
     }
 
-    switch (binary->kind) {
+    switch (binary->kind)
+    {
     case NODE_ADD:
       emitln("\tadd %s, %s", di_reg, ax_reg);
       return;
@@ -211,7 +295,7 @@ static void gen_expr(Node *node) {
         emitln("\tcqo");
       else
         emitln("\tcdq");
-      emitln("\tidiv %s",di_reg);
+      emitln("\tidiv %s", di_reg);
       return;
     case NODE_EQ:
     case NODE_NE:
@@ -235,15 +319,18 @@ static void gen_expr(Node *node) {
     }
     break;
   }
-  case NODE_TAG_MEMBER: {
+  case NODE_TAG_MEMBER:
+  {
     gen_addr(node);
     load(node->type);
     return;
   }
-  case NODE_TAG_FUNCALL: {
+  case NODE_TAG_FUNCALL:
+  {
     struct FunCallNode *fun_call = (struct FunCallNode *)node;
     int nargs = 0;
-    for (Node *arg = fun_call->args; arg; arg = arg->next) {
+    for (Node *arg = fun_call->args; arg; arg = arg->next)
+    {
       gen_expr(arg);
       push();
       nargs++;
@@ -256,7 +343,8 @@ static void gen_expr(Node *node) {
     emitln("\tcall %s", fun_call->funcname);
     return;
   }
-  case NODE_TAG_VAR: {
+  case NODE_TAG_VAR:
+  {
     // struct VarNode *var_node = (struct VarNode *)node;
     gen_addr(node);
     load(node->type);
@@ -272,13 +360,17 @@ static void gen_expr(Node *node) {
   error_tok(node->tok, "invalid expression");
 }
 
-static void gen_stmt(Node *node) {
+static void gen_stmt(Node *node)
+{
   emitln("\t.loc 1 %lu %lu", node->tok->line_no, node->tok->col_pos);
 
-  switch (node->tag) {
-  case NODE_TAG_UNARY: {
+  switch (node->tag)
+  {
+  case NODE_TAG_UNARY:
+  {
     struct UnaryNode *unary = (struct UnaryNode *)node;
-    switch (unary->kind) {
+    switch (unary->kind)
+    {
     case NODE_EXPR_STMT:
       gen_expr(unary->expr);
       return;
@@ -291,7 +383,8 @@ static void gen_stmt(Node *node) {
     }
     break;
   }
-  case NODE_TAG_IF: {
+  case NODE_TAG_IF:
+  {
     struct IfNode *if_node = (struct IfNode *)node;
     const int c = count();
     gen_expr(if_node->cond_expr);
@@ -300,19 +393,22 @@ static void gen_stmt(Node *node) {
     gen_stmt(if_node->then_stmt);
     emitln("\tjmp .L.end.%d", c);
     emitln(".L.else.%d:", c);
-    if (if_node->else_stmt) {
+    if (if_node->else_stmt)
+    {
       gen_stmt(if_node->else_stmt);
     }
     emitln(".L.end.%d:", c);
     return;
   }
-  case NODE_TAG_FOR: {
+  case NODE_TAG_FOR:
+  {
     struct ForNode *for_node = (struct ForNode *)node;
     int c = count();
     if (for_node->init_expr)
       gen_stmt(for_node->init_expr);
     emitln(".L.begin.%d:", c);
-    if (for_node->cond_expr) {
+    if (for_node->cond_expr)
+    {
       gen_expr(for_node->cond_expr);
       emitln("\tcmp $0, %%rax");
       emitln("\tje  .L.end.%d", c);
@@ -324,9 +420,11 @@ static void gen_stmt(Node *node) {
     emitln(".L.end.%d:", c);
     return;
   }
-  case NODE_TAG_BLOCK: {
+  case NODE_TAG_BLOCK:
+  {
     struct BlockNode *block_node = (struct BlockNode *)node;
-    for (Node *n = block_node->body; n; n = n->next) {
+    for (Node *n = block_node->body; n; n = n->next)
+    {
       gen_stmt(n);
     }
     return;
@@ -339,13 +437,16 @@ static void gen_stmt(Node *node) {
 }
 
 // Assign offsets to local variables.
-static void assign_lvar_offsets(Obj *prog) {
-  for (Obj *fn = prog; fn; fn = fn->next) {
+static void assign_lvar_offsets(Obj *prog)
+{
+  for (Obj *fn = prog; fn; fn = fn->next)
+  {
     if (!fn->is_function)
       continue;
 
     int offset = 0;
-    for (Obj *var = fn->locals; var; var = var->next) {
+    for (Obj *var = fn->locals; var; var = var->next)
+    {
       offset += var->type->size;
       offset = align_to(offset, var->type->align);
       var->offset = -offset;
@@ -354,25 +455,33 @@ static void assign_lvar_offsets(Obj *prog) {
   }
 }
 
-static void emit_data(Obj *prog) {
-  for (Obj *var = prog; var; var = var->next) {
+static void emit_data(Obj *prog)
+{
+  for (Obj *var = prog; var; var = var->next)
+  {
     if (var->is_function)
       continue;
 
     emitln(".data");
     emitln(".globl %s", var->name);
     emitln("%s:", var->name);
-    if (var->init_data) {
-      for (int i = 0; i < var->type->size; i++) {
+    if (var->init_data)
+    {
+      for (int i = 0; i < var->type->size; i++)
+      {
         emitln("\t.byte %d", var->init_data[i]);
       }
-    } else {
+    }
+    else
+    {
       emitln("\t.zero %d", var->type->size);
     }
   }
 }
-static void store_gp(int r, int offset, int sz) {
-  switch (sz) {
+static void store_gp(int r, int offset, int sz)
+{
+  switch (sz)
+  {
   case 1:
     emitln("\tmov %s, %d(%%rbp)", argreg8[r], offset);
     return;
@@ -389,8 +498,10 @@ static void store_gp(int r, int offset, int sz) {
   unreachable();
 }
 
-static void emit_text(Obj *prog) {
-  for (Obj *fn = prog; fn; fn = fn->next) {
+static void emit_text(Obj *prog)
+{
+  for (Obj *fn = prog; fn; fn = fn->next)
+  {
     if (!fn->is_function || !fn->is_definition)
       continue;
 
@@ -400,7 +511,8 @@ static void emit_text(Obj *prog) {
     current_fn = fn;
 
     // Prologue
-    if (fn->stack_size != 0) {
+    if (fn->stack_size != 0)
+    {
       emitln("\tpush %%rbp");
       emitln("\tmov %%rsp, %%rbp");
 
@@ -418,7 +530,8 @@ static void emit_text(Obj *prog) {
 
     // Epilogue
     emitln(".L.return.%s:", fn->name);
-    if (fn->stack_size != 0) {
+    if (fn->stack_size != 0)
+    {
       emitln("\tmov %%rbp, %%rsp");
       emitln("\tpop %%rbp");
     }
@@ -426,7 +539,8 @@ static void emit_text(Obj *prog) {
   }
 }
 
-void codegen(Obj *prog, FILE *out) {
+void codegen(Obj *prog, FILE *out)
+{
   output_file = out;
   assign_lvar_offsets(prog);
   emit_data(prog);

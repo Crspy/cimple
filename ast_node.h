@@ -28,7 +28,8 @@ typedef enum {
   NODE_DEREF,     // unary *
   NODE_EXPR_STMT, // Expression statement
   NODE_STMT_EXPR, // Statement expression
-  NODE_RETURN,    // "return"
+  NODE_RETURN,    // "return" 
+  NODE_CAST,      // Type cast
 } UnaryKind;
 typedef struct UnaryNode {
   Node node;
