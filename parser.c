@@ -50,6 +50,9 @@ static Obj *locals;
 // Likewise, global variables are accumulated to this list.
 static Obj *globals;
 
+// Points to the function object the parser is currently parsing.
+static Obj *current_fn;
+
 static bool is_typename(const Token *tok);
 static Type *struct_decl(const Token **rest, const Token *tok);
 static Type *union_decl(const Token **rest, const Token *tok);
@@ -349,7 +352,7 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
       type = long_type();
       break;
     default:
-      error_tok(tok, "invalid type");
+      error_tok(tok, "invalid type %d",tok->kind);
     }
 
     tok = tok->next;
@@ -526,7 +529,9 @@ static Node *stmt(const Token **rest, const Token *tok)
 {
   if (check(tok, TOKEN_RETURN))
   {
-    Node *node = new_unary_node(NODE_RETURN, expr(&tok, tok->next), tok);
+    Node* return_expr = expr(&tok, tok->next);
+    add_type(return_expr);
+    Node *node = new_unary_node(NODE_RETURN, new_cast_node(return_expr, current_fn->type->return_type), tok);
     *rest = consume(tok, TOKEN_SEMICOLON);
     return node;
   }
@@ -1212,6 +1217,7 @@ static const Token *function(const Token *tok, Type *base_type)
   if (!fn->is_definition)
     return tok;
 
+  current_fn = fn;
   locals = NULL;
   enter_scope();
   create_param_lvars(type->params);

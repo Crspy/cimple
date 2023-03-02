@@ -119,8 +119,8 @@ void error_tok(const Token *tok, const char *fmt, ...) {
 
 // Ensure that the current token is `str`.
 bool equal(const Token *tok, const char *cstr , size_t cstr_len) {
-  const size_t min_len = cstr_len < tok->len ? cstr_len : tok->len;
-  return memcmp(tok->loc, cstr, min_len) == 0 && cstr[min_len] == '\0';
+  //const size_t min_len = cstr_len < tok->len;
+  return cstr_len == tok->len && memcmp(tok->loc, cstr, cstr_len) == 0;
 }
 
 // Consumes the current token if it matches `op`.
