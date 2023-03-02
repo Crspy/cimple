@@ -75,7 +75,7 @@ static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 static const Token *parse_typedef(const Token *tok, Type *base_type);
 
-static Node *new_long_num_node(int64_t val,const Token *tok)
+static Node *new_long_num_node(int64_t val, const Token *tok)
 {
   Node *node = new_num_node(val, tok);
   node->type = long_type();
@@ -233,7 +233,7 @@ static int64_t get_number(const Token *tok)
   return tok->val;
 }
 
-// declspec = ("void" | "char" | "short" | "int" | "long"
+// declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
 //             | "typedef"
 //             | struct-decl | union-decl | typedef-name)+
 //
@@ -257,11 +257,12 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
   enum
   {
     VOID = 1 << 0,
-    CHAR = 1 << 2,
-    SHORT = 1 << 4,
-    INT = 1 << 6,
-    LONG = 1 << 8,
-    OTHER = 1 << 10,
+    BOOL = 1 << 2,
+    CHAR = 1 << 4,
+    SHORT = 1 << 6,
+    INT = 1 << 8,
+    LONG = 1 << 10,
+    OTHER = 1 << 12,
   };
 
   Type *type = int_type();
@@ -315,6 +316,9 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
     case TOKEN_VOID:
       counter += VOID;
       break;
+    case TOKEN_BOOL:
+      counter += BOOL;
+      break;
     case TOKEN_CHAR:
       counter += CHAR;
       break;
@@ -336,6 +340,9 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
     case VOID:
       type = void_type();
       break;
+    case BOOL:
+      type = bool_type();
+      break;
     case CHAR:
       type = char_type();
       break;
@@ -352,7 +359,7 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
       type = long_type();
       break;
     default:
-      error_tok(tok, "invalid type %d",tok->kind);
+      error_tok(tok, "invalid type %d", tok->kind);
     }
 
     tok = tok->next;
@@ -506,6 +513,7 @@ static bool is_typename(const Token *tok)
   switch (tok->kind)
   {
   case TOKEN_VOID:
+  case TOKEN_BOOL:
   case TOKEN_CHAR:
   case TOKEN_SHORT:
   case TOKEN_INT:
@@ -529,7 +537,7 @@ static Node *stmt(const Token **rest, const Token *tok)
 {
   if (check(tok, TOKEN_RETURN))
   {
-    Node* return_expr = expr(&tok, tok->next);
+    Node *return_expr = expr(&tok, tok->next);
     add_type(return_expr);
     Node *node = new_unary_node(NODE_RETURN, new_cast_node(return_expr, current_fn->type->return_type), tok);
     *rest = consume(tok, TOKEN_SEMICOLON);
@@ -872,7 +880,7 @@ static Node *cast(const Token **rest, const Token *tok)
     Type *type = typename(&tok, tok->next);
     tok = consume(tok, TOKEN_RIGHT_PAREN);
 
-    Node* node = new_cast_node(cast(rest, tok),type);
+    Node *node = new_cast_node(cast(rest, tok), type);
     node->tok = start;
 
     return node;
@@ -1099,7 +1107,8 @@ static Node *funcall(const Token **rest, const Token *tok)
     Node *arg = assign(&tok, tok);
     add_type(arg);
 
-    if (param_type) {
+    if (param_type)
+    {
       if (param_type->kind == TYPE_STRUCT || param_type->kind == TYPE_UNION)
       {
         error_tok(arg->tok, "passing struct or union is not supported yet");

@@ -162,6 +162,14 @@ static void store(Type *type)
     emitln("\tmov %%rax, (%%rdi)");
 }
 
+static void cmp_zero(Type *type)
+{
+  if (is_integer(type) && type->size <= 4)
+    emitln("\ttest %%eax, %%eax");
+  else
+    emitln("\ttest %%rax, %%rax");
+}
+
 static int getTypeId(Type *type)
 {
   enum cast_table_id
@@ -201,6 +209,13 @@ static void cast(Type *from, Type *to)
 {
   if (to->kind == TYPE_VOID)
     return;
+  if (to->kind == TYPE_BOOL)
+  {
+    cmp_zero(from);
+    emitln("\tsetne %%al");
+    emitln("\tmovzx %%al, %%eax");
+    return;
+  }
 
   int from_id = getTypeId(from);
   int to_id = getTypeId(to);

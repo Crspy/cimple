@@ -11,6 +11,14 @@ Type *void_type()
   type->align = 1;
   return type;
 }
+Type *bool_type()
+{
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_BOOL;
+  type->size = 1;
+  type->align = 1;
+  return type;
+}
 Type *char_type()
 {
   Type *type = calloc(1, sizeof(Type));
@@ -74,7 +82,17 @@ Type *new_union_type(Member *members, size_t size, size_t align)
 
 bool is_integer(Type *type)
 {
-  return type->kind == TYPE_LONG || type->kind == TYPE_INT || type->kind == TYPE_SHORT || type->kind == TYPE_CHAR;
+  switch(type->kind)
+  {
+  case TYPE_BOOL:
+  case TYPE_CHAR:
+  case TYPE_SHORT:
+  case TYPE_INT:
+  case TYPE_LONG:
+    return true;
+  default:
+    return false;
+  }
 }
 
 Type *copy_type(Type *type)
