@@ -71,11 +71,12 @@ BlockNode *new_block_node(Node *body, const Token *tok)
   return node;
 }
 Node *new_fun_call_node(const char *funcname, int funcname_len,
-                        Node *args, const Token *tok)
+                        Node *args, const Token *tok, Type *func_type)
 {
   struct FunCallNode *node = calloc(1, sizeof(struct FunCallNode));
   node->node.tag = NODE_TAG_FUNCALL;
   node->node.tok = tok;
+  node->func_type = func_type;
   node->funcname = funcname;
   node->funcname_length = funcname_len;
   node->args = args;

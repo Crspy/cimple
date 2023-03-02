@@ -5,8 +5,10 @@
 
 // AST node
 typedef struct Node Node;
-struct Node {
-  enum NodeTag {
+struct Node
+{
+  enum NodeTag
+  {
     NODE_TAG_UNARY,
     NODE_TAG_BINARY,
     NODE_TAG_MEMBER,
@@ -22,22 +24,25 @@ struct Node {
   const Token *tok;  // Representative token
 };
 
-typedef enum {
+typedef enum
+{
   NODE_NEG,       // unary -
   NODE_ADDR,      // unary &
   NODE_DEREF,     // unary *
   NODE_EXPR_STMT, // Expression statement
   NODE_STMT_EXPR, // Statement expression
-  NODE_RETURN,    // "return" 
+  NODE_RETURN,    // "return"
   NODE_CAST,      // Type cast
 } UnaryKind;
-typedef struct UnaryNode {
+typedef struct UnaryNode
+{
   Node node;
   UnaryKind kind;
   Node *expr;
 } UnaryNode;
 
-typedef enum {
+typedef enum
+{
   NODE_ADD,    // +
   NODE_SUB,    // -
   NODE_MUL,    // *
@@ -49,51 +54,60 @@ typedef enum {
   NODE_ASSIGN, // =
   NODE_COMMA,  // ,
 } BinaryKind;
-typedef struct BinaryNode {
+typedef struct BinaryNode
+{
   Node node;
   BinaryKind kind;
   Node *lhs; // Left-hand side
   Node *rhs; // Right-hand side
 } BinaryNode;
-typedef struct MemberNode {
+typedef struct MemberNode
+{
   Node node;
-  Node *lhs; // Left-hand side
+  Node *lhs;             // Left-hand side
   struct Member *member; // Right-hand side
 } MemberNode;
-typedef struct IfNode {
+typedef struct IfNode
+{
   Node node;
   Node *cond_expr;
   Node *then_stmt;
   Node *else_stmt;
 } IfNode;
-typedef struct ForNode {
+typedef struct ForNode
+{
   Node node;
   Node *init_expr;
   Node *cond_expr;
   Node *inc_expr;
   Node *body_stmt;
 } ForNode;
-typedef struct BlockNode {
+typedef struct BlockNode
+{
   Node node;
   Node *body;
 } BlockNode;
-typedef struct FunCallNode {
+typedef struct FunCallNode
+{
   Node node;
   Node *args;
+  struct Type *func_type;
   const char *funcname;
   int funcname_length;
 } FunCallNode;
-typedef struct VarNode {
+typedef struct VarNode
+{
   Node node;
   const struct Obj *var;
 } VarNode;
-typedef struct NumNode {
+typedef struct NumNode
+{
   Node node;
   int64_t val;
 } NumNode;
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok);
-Node * new_cast_node(Node* expr, struct Type* type);
+Node *new_cast_node(Node *expr, struct Type *type);
 Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs, const Token *tok);
 Node *new_member_node(Node *lhs, struct Member *member, const Token *tok);
 Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
@@ -102,7 +116,7 @@ Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
                    Node *body_stmt, const Token *tok);
 BlockNode *new_block_node(Node *body, const Token *tok);
 Node *new_fun_call_node(const char *funcname, int funcname_len, Node *args,
-                        const Token *tok);
+                        const Token *tok, struct Type* func_type);
 Node *new_var_node(const struct Obj *var, const Token *tok);
 Node *new_num_node(int64_t val, const Token *tok);
 
