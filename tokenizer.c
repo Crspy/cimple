@@ -71,7 +71,7 @@ void error(const char *fmt, ...) {
   exit(1);
 }
 
-// Reports an error message in the following format and exit.
+// Reports an error message in the following format.
 //
 // foo.c:10: x = y + 1;
 //               ^ <error message here>
@@ -96,7 +96,6 @@ static void verror_at(size_t line_no, const char *loc, const char *fmt,
   fprintf(stderr, "%*s^ ", pos, ""); // print pos spaces.
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
-  exit(1);
 }
 
 void error_at(const char *loc, const char *fmt, ...) {
@@ -108,12 +107,14 @@ void error_at(const char *loc, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(line_no, loc, fmt, ap);
+  exit(1);
 }
 
 void error_tok(const Token *tok, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   verror_at(tok->line_no, tok->loc, fmt, ap);
+  exit(1);
 }
 
 // Ensure that the current token is `str`.

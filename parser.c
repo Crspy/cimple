@@ -1074,6 +1074,14 @@ static Node *funcall(const Token **rest, const Token *tok)
   const Token *start = tok;
   tok = tok->next->next;
 
+  VarScope *sc = find_var(start);
+  if (!sc)
+    error_tok(start, "implicit declaration of a function");
+  if (!sc->var || sc->var->type->kind != TYPE_FUNC)
+    error_tok(start, "cannot be used as a function");
+
+  Type *return_type = sc->var->type->return_type;
+
   Node head = {0};
   Node *cur = &head;
 
@@ -1082,15 +1090,14 @@ static Node *funcall(const Token **rest, const Token *tok)
     if (cur != &head)
       tok = consume(tok, TOKEN_COMMA);
     cur = cur->next = assign(&tok, tok);
+    add_type(cur);
   }
 
   *rest = consume(tok, TOKEN_RIGHT_PAREN);
 
   Node *node = new_fun_call_node(strndup(start->loc, start->len), start->len,
                                  head.next, start);
-  // node->funcname = strndup(start->loc, start->len);
-  // node->funcname_length = start->len;
-  // node->args = head.next;
+  node->type = return_type;
   return node;
 }
 
