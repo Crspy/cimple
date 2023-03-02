@@ -72,6 +72,13 @@ static Node *unary(const Token **rest, const Token *tok);
 static Node *primary(const Token **rest, const Token *tok);
 static const Token *parse_typedef(const Token *tok, Type *base_type);
 
+static Node *new_long_num_node(int64_t val,const Token *tok)
+{
+  Node *node = new_num_node(val, tok);
+  node->type = long_type();
+  return node;
+}
+
 static void enter_scope(void)
 {
   Scope *sc = calloc(1, sizeof(Scope));
@@ -757,7 +764,7 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
   }
 
   // ptr + num
-  rhs = new_binary_node(NODE_MUL, rhs, new_num_node(lhs->type->base->size, tok),
+  rhs = new_binary_node(NODE_MUL, rhs, new_long_num_node(lhs->type->base->size, tok),
                         tok); // TODO: make this a right left (<<) by n instead
   return new_binary_node(NODE_ADD, lhs, rhs, tok);
 }
@@ -775,9 +782,10 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
   // ptr - num
   if (lhs->type->base && is_integer(rhs->type))
   {
-    rhs =
-        new_binary_node(NODE_MUL, rhs, new_num_node(lhs->type->base->size, tok),
-                        tok); // TODO: make this a right left (<<) by n instead
+    rhs = new_binary_node(NODE_MUL,
+                          rhs,
+                          new_long_num_node(lhs->type->base->size, tok),
+                          tok); // TODO: make this a right left (<<) by n instead
     add_type(rhs);
     Node *node = new_binary_node(NODE_SUB, lhs, rhs, tok);
     node->type = lhs->type;
@@ -850,8 +858,6 @@ static Node *factor(const Token **rest, const Token *tok)
   }
 }
 
-
-
 // cast = "(" type-name ")" cast | unary
 static Node *cast(const Token **rest, const Token *tok)
 {
@@ -861,10 +867,8 @@ static Node *cast(const Token **rest, const Token *tok)
     Type *type = typename(&tok, tok->next);
     tok = consume(tok, TOKEN_RIGHT_PAREN);
 
-    Node* expr = cast(rest, tok);
-    add_type(expr);
-    Node *node = new_unary_node(NODE_CAST, expr, start);
-    node->type = type;
+    Node* node = new_cast_node(cast(rest, tok),type);
+    node->tok = start;
 
     return node;
   }

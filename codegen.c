@@ -121,10 +121,15 @@ static void load(Type *type)
     return;
   }
 
+  // When we load a char or a short value to a register, we always
+  // extend them to the size of int, so we can assume the lower half of
+  // a register always contains a valid value. The upper half of a
+  // register for char, short and int may contain garbage. When we load
+  // a long value to a register, it simply occupies the entire register.
   if (type->size == 1)
-    emitln("\tmovsbq (%%rax), %%rax");
+    emitln("\tmovsbl (%%rax), %%eax");
   else if (type->size == 2)
-    emitln("\tmovswq (%%rax), %%rax");
+    emitln("\tmovswl (%%rax), %%eax");
   else if (type->size == 4)
     emitln("\tmovsxd (%%rax), %%rax");
   else

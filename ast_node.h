@@ -93,6 +93,7 @@ typedef struct NumNode {
 } NumNode;
 
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok);
+Node * new_cast_node(Node* expr, struct Type* type);
 Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs, const Token *tok);
 Node *new_member_node(Node *lhs, struct Member *member, const Token *tok);
 Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,

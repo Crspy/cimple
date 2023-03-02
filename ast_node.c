@@ -2,7 +2,8 @@
 #include "ast_node.h"
 #include "cimple.h"
 
-Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok) {
+Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok)
+{
   struct UnaryNode *node = calloc(1, sizeof(struct UnaryNode));
   node->node.tag = NODE_TAG_UNARY;
   node->node.tok = tok;
@@ -10,8 +11,16 @@ Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok) {
   node->expr = expr;
   return (Node *)node;
 }
+Node *new_cast_node(Node *expr, struct Type *type)
+{
+  add_type(expr);
+  Node *node = new_unary_node(NODE_CAST, expr, expr->tok);
+  node->type = type;
+  return node;
+}
 Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs,
-                             const Token *tok) {
+                      const Token *tok)
+{
   struct BinaryNode *node = calloc(1, sizeof(struct BinaryNode));
   node->node.tag = NODE_TAG_BINARY;
   node->node.tok = tok;
@@ -21,7 +30,8 @@ Node *new_binary_node(BinaryKind kind, Node *lhs, Node *rhs,
   return (Node *)node;
 }
 Node *new_member_node(Node *lhs, Member *member,
-                             const Token *tok) {
+                      const Token *tok)
+{
   MemberNode *node = calloc(1, sizeof(struct MemberNode));
   node->node.tag = NODE_TAG_MEMBER;
   node->node.tok = tok;
@@ -30,7 +40,8 @@ Node *new_member_node(Node *lhs, Member *member,
   return (Node *)node;
 }
 Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
-                         const Token *tok) {
+                  const Token *tok)
+{
   struct IfNode *node = calloc(1, sizeof(struct IfNode));
   node->node.tag = NODE_TAG_IF;
   node->node.tok = tok;
@@ -40,7 +51,8 @@ Node *new_if_node(Node *cond_expr, Node *then_stmt, Node *else_stmt,
   return (Node *)node;
 }
 Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
-                          Node *body_stmt, const Token *tok) {
+                   Node *body_stmt, const Token *tok)
+{
   struct ForNode *node = calloc(1, sizeof(struct ForNode));
   node->node.tag = NODE_TAG_FOR;
   node->node.tok = tok;
@@ -50,7 +62,8 @@ Node *new_for_node(Node *init_expr, Node *cond_expr, Node *inc_expr,
   node->body_stmt = body_stmt;
   return (Node *)node;
 }
-BlockNode *new_block_node(Node *body, const Token *tok) {
+BlockNode *new_block_node(Node *body, const Token *tok)
+{
   struct BlockNode *node = calloc(1, sizeof(struct BlockNode));
   node->node.tag = NODE_TAG_BLOCK;
   node->node.tok = tok;
@@ -58,7 +71,8 @@ BlockNode *new_block_node(Node *body, const Token *tok) {
   return node;
 }
 Node *new_fun_call_node(const char *funcname, int funcname_len,
-                               Node *args, const Token *tok) {
+                        Node *args, const Token *tok)
+{
   struct FunCallNode *node = calloc(1, sizeof(struct FunCallNode));
   node->node.tag = NODE_TAG_FUNCALL;
   node->node.tok = tok;
@@ -67,14 +81,16 @@ Node *new_fun_call_node(const char *funcname, int funcname_len,
   node->args = args;
   return (Node *)node;
 }
-Node *new_var_node(const Obj *var, const Token *tok) {
+Node *new_var_node(const Obj *var, const Token *tok)
+{
   struct VarNode *node = calloc(1, sizeof(struct VarNode));
   node->node.tag = NODE_TAG_VAR;
   node->node.tok = tok;
   node->var = var;
   return (Node *)node;
 }
-Node *new_num_node(int64_t val, const Token *tok) {
+Node *new_num_node(int64_t val, const Token *tok)
+{
   struct NumNode *node = calloc(1, sizeof(struct NumNode));
   node->node.tag = NODE_TAG_NUM;
   node->node.tok = tok;
