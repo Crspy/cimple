@@ -2,8 +2,17 @@
 #include "cimple.h"
 #include "type.h"
 
-/*static Type type_int = {.kind = TYPE_INT, .size = 8};*/
-Type *void_type()
+
+Type *enum_type(void)
+{
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYPE_ENUM;
+  type->size = 4;
+  type->align = 4;
+  return type;
+}
+
+Type *void_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_VOID;
@@ -11,7 +20,7 @@ Type *void_type()
   type->align = 1;
   return type;
 }
-Type *bool_type()
+Type *bool_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_BOOL;
@@ -19,7 +28,7 @@ Type *bool_type()
   type->align = 1;
   return type;
 }
-Type *char_type()
+Type *char_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_CHAR;
@@ -27,7 +36,7 @@ Type *char_type()
   type->align = 1;
   return type;
 }
-Type *short_type()
+Type *short_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_SHORT;
@@ -36,7 +45,7 @@ Type *short_type()
   return type;
 }
 
-Type *int_type()
+Type *int_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_INT;
@@ -44,7 +53,7 @@ Type *int_type()
   type->align = 4;
   return type;
 }
-Type *long_type()
+Type *long_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYPE_LONG;
@@ -89,6 +98,7 @@ bool is_integer(Type *type)
   case TYPE_SHORT:
   case TYPE_INT:
   case TYPE_LONG:
+  case TYPE_ENUM:
     return true;
   default:
     return false;

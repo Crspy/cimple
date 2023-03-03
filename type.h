@@ -12,6 +12,7 @@ typedef enum {
   TYPE_SHORT,
   TYPE_INT,
   TYPE_LONG,
+  TYPE_ENUM,
   TYPE_PTR,
   TYPE_FUNC,
   TYPE_ARRAY,
@@ -58,12 +59,13 @@ struct Member {
 };
 
 Member new_member(Type* type,const Token* name);
-Type *long_type();
-Type *int_type();
-Type *short_type();
-Type *char_type();
-Type *bool_type();
-Type *void_type();
+Type *long_type(void);
+Type *int_type(void);
+Type *short_type(void);
+Type *char_type(void);
+Type *bool_type(void);
+Type *void_type(void);
+Type *enum_type(void);
 bool is_integer(Type *type);
 Type *copy_type(Type *type);
 Type *pointer_to(Type *base);

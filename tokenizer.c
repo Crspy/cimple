@@ -13,6 +13,7 @@ static const char *tokens_strings[TOKEN_TOTAL_COUNT] = {
     [TOKEN_ELSE] = "else",
     [TOKEN_FOR] = "for",
     [TOKEN_WHILE] = "while",
+    [TOKEN_ENUM] = "enum",
     [TOKEN_LONG] = "long",
     [TOKEN_INT] = "int",
     [TOKEN_SHORT] = "short",

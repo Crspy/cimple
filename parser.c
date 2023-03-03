@@ -12,7 +12,7 @@ struct TagScope
   Type *type;
 };
 
-// Scope for local, global variables or typedefs
+// Scope for local vars, global vars, typedefs or enum constants
 typedef struct VarScope VarScope;
 struct VarScope
 {
@@ -21,6 +21,8 @@ struct VarScope
   size_t name_len;
   const Obj *var;
   Type *type_def;
+  Type *enum_type;
+  int enum_val;
 };
 
 // Represents a block scope.
@@ -29,8 +31,8 @@ struct Scope
 {
   Scope *next;
 
-  // C has two block scopes; one is for variables and the other is
-  // for struct tags.
+  // C has two block scopes; one is for variables/typedefs
+  // and the other is for struct/union/enum tags.
   VarScope *vars;
   TagScope *tags;
 };
@@ -54,6 +56,7 @@ static Obj *globals;
 static Obj *current_fn;
 
 static bool is_typename(const Token *tok);
+static Type *enum_specifier(const Token **rest, const Token *tok);
 static Type *struct_decl(const Token **rest, const Token *tok);
 static Type *union_decl(const Token **rest, const Token *tok);
 static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr);
@@ -210,6 +213,7 @@ static char *get_ident(const Token *tok)
   {
     error_tok(tok, "expected an identifier");
   }
+  // TODO: optimize this (maybe we don't need a null-terminated string)
   return strndup(tok->loc, tok->len);
 }
 
@@ -235,7 +239,7 @@ static int64_t get_number(const Token *tok)
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
 //             | "typedef"
-//             | struct-decl | union-decl | typedef-name)+
+//             | struct-decl | union-decl | typedef-name | enum-specifier)+
 //
 // The order of typenames in a type-specifier doesn't matter. For
 // example, `int long static` means the same as `static long int`.
@@ -286,7 +290,7 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
 
     // Handle user-defined types.
     Type *type_def = find_typedef(tok);
-    if (check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION) || type_def)
+    if (check(tok, TOKEN_STRUCT) || check(tok, TOKEN_UNION) || check(tok, TOKEN_ENUM) || type_def)
     {
 
       if (counter != 0)
@@ -299,6 +303,10 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
       else if (check(tok, TOKEN_UNION))
       {
         type = union_decl(&tok, tok->next);
+      }
+      else if (check(tok, TOKEN_ENUM))
+      {
+        type = enum_specifier(&tok, tok->next);
       }
       else
       { // if(type_def)
@@ -471,6 +479,67 @@ static Type *typename(const Token **rest, const Token *tok)
   return abstract_declarator(rest, tok, type);
 }
 
+// enum-specifier = ident? "{" enum-list? "}"
+//                | ident ("{" enum-list? "}")?
+//
+// enum-list      = ident ("=" num)? ("," ident ("=" num)?)*
+static Type *enum_specifier(const Token **rest, const Token *tok)
+{
+
+  // Read a struct tag.
+  const Token *tag = NULL;
+  if (check(tok, TOKEN_IDENT))
+  {
+    tag = tok;
+    tok = tok->next;
+  }
+
+  if (tag && !check(tok, TOKEN_LEFT_BRACE))
+  {
+    Type *type = find_tag(tag);
+    if (!type)
+      error_tok(tag, "unknown enum type");
+
+    if (type->kind != TYPE_ENUM)
+      error_tok(tag, "not an enum tag");
+
+    *rest = tok;
+    return type;
+  }
+
+  tok = consume(tok, TOKEN_LEFT_BRACE);
+
+  Type *type = enum_type();
+
+  // Read an enum-list.
+  int i = 0;
+  int enum_val = 0;
+  while (!check(tok, TOKEN_RIGHT_BRACE))
+  {
+    if (i++ > 0)
+      tok = consume(tok, TOKEN_COMMA);
+
+    char *name = get_ident(tok);
+    VarScope *sc = push_scope(name, tok->len);
+    sc->enum_type = type;
+    tok = tok->next;
+
+    if (check(tok, TOKEN_EQUAL))
+    {
+      enum_val = get_number(tok->next);
+      tok = tok->next->next;
+    }
+
+    sc->enum_val = enum_val++;
+  }
+
+  *rest = tok->next;
+
+  if (tag)
+    push_tag_scope(tag, type);
+  return type;
+}
+
 // declaration = declspec (declarator ("=" expr)? ("," declarator ("="
 // expr)?)*)? ";"
 static BlockNode *declaration(const Token **rest, const Token *tok,
@@ -521,6 +590,7 @@ static bool is_typename(const Token *tok)
   case TOKEN_STRUCT:
   case TOKEN_UNION:
   case TOKEN_TYPEDEF:
+  case TOKEN_ENUM:
     return true;
   default:
     return find_typedef(tok) != NULL;
@@ -1175,13 +1245,20 @@ static Node *primary(const Token **rest, const Token *tok)
       return funcall(rest, tok);
     }
 
+    // Variable or enum constant
     const VarScope *var_scope = find_var(tok);
-    if (!var_scope || !var_scope->var)
+    if (!var_scope || (!var_scope->var && !var_scope->enum_type))
     {
       error_tok(tok, "undefined variable");
     }
+    Node *node;
+    if (var_scope->var)
+      node = new_var_node(var_scope->var, tok);
+    else
+      node = new_num_node(var_scope->enum_val, tok);
+
     *rest = tok->next;
-    return new_var_node(var_scope->var, tok);
+    return node;
   }
 
   if (check(tok, TOKEN_STR))

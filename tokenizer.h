@@ -12,6 +12,7 @@ typedef enum {
   TOKEN_ELSE,
   TOKEN_FOR,
   TOKEN_WHILE,
+  TOKEN_ENUM,
   TOKEN_LONG,
   TOKEN_INT,
   TOKEN_SHORT,
