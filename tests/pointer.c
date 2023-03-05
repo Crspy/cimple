@@ -1,6 +1,7 @@
 #include "test.h"
 
-int main() {
+int main()
+{
   ASSERT(3, ({ int x=3; *&x; }));
   ASSERT(3, ({ int x=3; int *y=&x; int **z=&y; **z; }));
   ASSERT(5, ({ int x=3; int y=5; *(&x+1); }));
@@ -26,6 +27,12 @@ int main() {
   ASSERT(4, ({ int x[2][3]; int *y=x; *(y+4)=4; *(*(x+1)+1); }));
   ASSERT(5, ({ int x[2][3]; int *y=x; *(y+5)=5; *(*(x+1)+2); }));
 
+  ASSERT(1, ({ int x[2][3]; int *y=x; y+= 1; *y=1; *(*x+1); }));
+  ASSERT(2, ({ int x[2][3]; int *y=x; y+= 2; *y=2; *(*x+2); }));
+  ASSERT(3, ({ int x[2][3]; int *y=x; y+= 3; *y=3; **(x+1); }));
+  ASSERT(4, ({ int x[2][3]; int *y=x; y+= 4; *y=4; *(*(x+1)+1); }));
+  ASSERT(5, ({ int x[2][3]; int *y=x; y+= 5; *y=5; *(*(x+1)+2); }));
+
   ASSERT(3, ({ int x[3]; *x=3; x[1]=4; x[2]=5; *x; }));
   ASSERT(4, ({ int x[3]; *x=3; x[1]=4; x[2]=5; *(x+1); }));
   ASSERT(5, ({ int x[3]; *x=3; x[1]=4; x[2]=5; *(x+2); }));
@@ -38,7 +45,7 @@ int main() {
   ASSERT(3, ({ int x[2][3]; int *y=x; y[3]=3; x[1][0]; }));
   ASSERT(4, ({ int x[2][3]; int *y=x; y[4]=4; x[1][1]; }));
   ASSERT(5, ({ int x[2][3]; int *y=x; y[5]=5; x[1][2]; }));
-
+  
   printf("OK\n");
   return 0;
 }

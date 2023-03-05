@@ -52,6 +52,10 @@ static const char *tokens_strings[TOKEN_TOTAL_COUNT] = {
     [TOKEN_LESS_EQUAL] = "<=",
     [TOKEN_PLUS_PLUS] = "++",
     [TOKEN_MINUS_MINUS] = "--",
+    [TOKEN_PLUS_EQUAL] = "+=",
+    [TOKEN_MINUS_EQUAL] = "-=",
+    [TOKEN_STAR_EQUAL] = "*=",
+    [TOKEN_SLASH_EQUAL] = "/=",
     [TOKEN_ARROW] = "->",
     [TOKEN_IDENT] = "identifier",
     [TOKEN_STR] = "string literal",
@@ -223,6 +227,11 @@ static int read_punct(const char *p, TokenKind *kind)
       *kind = TOKEN_MINUS_MINUS;
       return 2;
     }
+    else if (p[1] == '=')
+    {
+      *kind = TOKEN_MINUS_EQUAL;
+      return 2;
+    }
     else if (p[1] == '>')
     {
       *kind = TOKEN_ARROW;
@@ -236,12 +245,27 @@ static int read_punct(const char *p, TokenKind *kind)
       *kind = TOKEN_PLUS_PLUS;
       return 2;
     }
+    else if (p[1] == '=')
+    {
+      *kind = TOKEN_PLUS_EQUAL;
+      return 2;
+    }
     *kind = TOKEN_PLUS;
     return 1;
   case '/':
+    if (p[1] == '=')
+    {
+      *kind = TOKEN_SLASH_EQUAL;
+      return 2;
+    }
     *kind = TOKEN_SLASH;
     return 1;
   case '*':
+    if (p[1] == '=')
+    {
+      *kind = TOKEN_STAR_EQUAL;
+      return 2;
+    }
     *kind = TOKEN_STAR;
     return 1;
   case '&':

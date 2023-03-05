@@ -72,6 +72,8 @@ static Node *assign(const Token **rest, const Token *tok);
 static Node *equality(const Token **rest, const Token *tok);
 static Node *comparison(const Token **rest, const Token *tok);
 static Node *term(const Token **rest, const Token *tok);
+static Node *new_add(Node *lhs, Node *rhs, const Token *tok);
+static Node *new_sub(Node *lhs, Node *rhs, const Token *tok);
 static Node *factor(const Token **rest, const Token *tok);
 static Node *cast(const Token **rest, const Token *tok);
 static Node *postfix(const Token **rest, const Token *tok);
@@ -771,12 +773,23 @@ static Node *expr(const Token **rest, const Token *tok)
   return node;
 }
 
-// assign = equality ("=" assign)?
+// assign    = equality (assign-op assign)?
+// assign-op = "=" | "+=" | "-=" | "*=" | "/="
 static Node *assign(const Token **rest, const Token *tok)
 {
   Node *node = equality(&tok, tok);
   if (check(tok, TOKEN_EQUAL))
     return new_binary_node(NODE_ASSIGN, node, assign(rest, tok->next), tok);
+
+  if (check(tok, TOKEN_PLUS_EQUAL))
+    return new_binary_node(NODE_ASSIGN, node,new_add(node,assign(rest, tok->next), tok), tok);
+  if (check(tok, TOKEN_MINUS_EQUAL))
+    return new_binary_node(NODE_ASSIGN, node, new_sub(node,assign(rest, tok->next), tok), tok);
+  if (check(tok, TOKEN_STAR_EQUAL))
+    return new_binary_node(NODE_ASSIGN, node, new_binary_node(NODE_MUL, node, assign(rest, tok->next), tok), tok);
+  if (check(tok, TOKEN_SLASH_EQUAL))
+    return new_binary_node(NODE_ASSIGN, node, new_binary_node(NODE_DIV, node, assign(rest, tok->next), tok), tok);
+
   *rest = tok;
   return node;
 }
