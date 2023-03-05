@@ -136,6 +136,76 @@ static void load(Type *type)
     emitln("\tmov (%%rax), %%rax");
 }
 
+// Load a local/global var to %rax
+static void load_var(VarNode *var_node)
+{
+  switch (var_node->var->type->kind)
+  {
+  case TYPE_ARRAY:
+  case TYPE_STRUCT:
+  case TYPE_UNION:
+    // If it is an array/struct/union, do not attempt to load a value to the
+    // register because in general we can't load an entire array to a
+    // register. As a result, the result of an evaluation of an array
+    // becomes not the array itself but the address of the array.
+    // This is where "array is automatically converted to a pointer to
+    // the first element of the array in C" occurs.
+    if (var_node->var->is_local)
+    {
+      // Local variable
+      emitln("\tlea %d(%%rbp), %%rax", var_node->var->offset);
+    }
+    else
+    {
+      // Global variable
+      emitln("\tlea %s(%%rip), %%rax", var_node->var->name);
+    }
+    return;
+  }
+
+  // When we load a char or a short value to a register, we always
+  // extend them to the size of int, so we can assume the lower half of
+  // a register always contains a valid value. The upper half of a
+  // register for char, short and int may contain garbage. When we load
+  // a long value to a register, it simply occupies the entire register.
+  if (var_node->var->is_local)
+  {
+    switch (var_node->var->type->size)
+    {
+    case 1:
+      emitln("\tmovsbl %d(%%rbp), %%eax", var_node->var->offset);
+      break;
+    case 2:
+      emitln("\tmovswl %d(%%rbp), %%eax", var_node->var->offset);
+      break;
+    case 4:
+      emitln("\tmovsxd %d(%%rbp), %%rax", var_node->var->offset);
+      break;
+    default:
+      emitln("\tmov %d(%%rbp), %%rax", var_node->var->offset);
+      break;
+    }
+  }
+  else
+  {
+    switch (var_node->var->type->size)
+    {
+    case 1:
+      emitln("\tmovsbl %s(%%rip), %%eax", var_node->var->name);
+      break;
+    case 2:
+      emitln("\tmovswl %s(%%rip), %%eax", var_node->var->name);
+      break;
+    case 4:
+      emitln("\tmovsxd %s(%%rip), %%rax", var_node->var->name);
+      break;
+    default:
+      emitln("\tmov %s(%%rip), %%rax", var_node->var->name);
+      break;
+    }
+  }
+}
+
 // Store %rax to an address that the stack top is pointing to.
 static void store(Type *type)
 {
@@ -232,9 +302,52 @@ static void gen_expr(Node *node)
   case NODE_TAG_UNARY:
   {
     struct UnaryNode *unary = (struct UnaryNode *)node;
-
     switch (unary->kind)
     {
+    case NODE_POST_INC:
+      gen_addr(unary->expr);
+      push();
+      load(node->type);
+      if (node->type->base)
+      {
+        emitln("\tadd $%lu, %%rax", node->type->base->size);
+      }
+      else
+      {
+        emitln("\tadd $%lu, %%rax", 1);
+      }
+      store(node->type);
+      if (node->type->base)
+      {
+        emitln("\tsub $%lu, %%rax", node->type->base->size);
+      }
+      else
+      {
+        emitln("\tsub $%lu, %%rax", 1);
+      }
+      return;
+    case NODE_POST_DEC:
+      gen_addr(unary->expr);
+      push();
+      load(node->type);
+      if (node->type->base)
+      {
+        emitln("\tsub $%lu, %%rax", node->type->base->size);
+      }
+      else
+      {
+        emitln("\tsub $%lu, %%rax", 1);
+      }
+      store(node->type);
+      if (node->type->base)
+      {
+        emitln("\tadd $%lu, %%rax", node->type->base->size);
+      }
+      else
+      {
+        emitln("\tadd $%lu, %%rax", 1);
+      }
+      return;
     case NODE_NEG:
       gen_expr(unary->expr);
       emitln("\tneg %%rax");
@@ -265,7 +378,6 @@ static void gen_expr(Node *node)
   case NODE_TAG_BINARY:
   {
     struct BinaryNode *binary = (struct BinaryNode *)node;
-
     if (binary->kind == NODE_ASSIGN)
     {
       gen_addr(binary->lhs);
@@ -365,9 +477,8 @@ static void gen_expr(Node *node)
   }
   case NODE_TAG_VAR:
   {
-    // struct VarNode *var_node = (struct VarNode *)node;
-    gen_addr(node);
-    load(node->type);
+    struct VarNode *var_node = (struct VarNode *)node;
+    load_var(var_node);
     return;
   }
   case NODE_TAG_NUM:
@@ -526,7 +637,7 @@ static void emit_text(Obj *prog)
       continue;
 
     emitln(".text");
-    
+
     if (fn->is_static)
       emitln(".local %s", fn->name);
     else

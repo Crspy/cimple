@@ -2,6 +2,23 @@
 #include "ast_node.h"
 #include "cimple.h"
 
+const char *node_tag_str[] = {
+    [NODE_TAG_UNARY] = "NODE_TAG_UNARY",
+    [NODE_TAG_BINARY] = "NODE_TAG_BINARY",
+    [NODE_TAG_MEMBER] = "NODE_TAG_MEMBER",
+    [NODE_TAG_IF] = "NODE_TAG_IF",
+    [NODE_TAG_FOR] = "NODE_TAG_FOR",
+    [NODE_TAG_BLOCK] = "NODE_TAG_BLOCK",
+    [NODE_TAG_FUNCALL] = "NODE_TAG_FUNCALL",
+    [NODE_TAG_VAR] = "NODE_TAG_VAR",
+    [NODE_TAG_NUM] = "NODE_TAG_NUM",
+};
+
+const char *node_tag_to_str(enum NodeTag tag)
+{
+  return node_tag_str[tag];
+}
+
 Node *new_unary_node(UnaryKind kind, Node *expr, const Token *tok)
 {
   struct UnaryNode *node = calloc(1, sizeof(struct UnaryNode));

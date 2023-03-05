@@ -2,7 +2,6 @@
 #include "cimple.h"
 #include "type.h"
 
-
 Type *enum_type(void)
 {
   Type *type = calloc(1, sizeof(Type));
@@ -91,7 +90,7 @@ Type *new_union_type(Member *members, size_t size, size_t align)
 
 bool is_integer(Type *type)
 {
-  switch(type->kind)
+  switch (type->kind)
   {
   case TYPE_BOOL:
   case TYPE_CHAR:
@@ -180,6 +179,12 @@ void add_type(struct Node *node)
 
     switch (unary->kind)
     {
+    case NODE_POST_INC:
+    case NODE_POST_DEC:
+    {
+      node->type = unary->expr->type;
+      return;
+    }
     case NODE_NEG:
     {
       Type *type = get_common_type(int_type(), unary->expr->type);
@@ -265,7 +270,29 @@ void add_type(struct Node *node)
       }
       if (binary->lhs->type->kind != TYPE_STRUCT)
       {
-        binary->rhs = new_cast_node(binary->rhs, binary->lhs->type);
+        if (binary->lhs->type->kind != TYPE_BOOL && binary->rhs->tag == NODE_TAG_NUM)
+        {
+          // compile time casting
+          NumNode *num_node = (NumNode *)binary->rhs;
+          switch (binary->lhs->type->size)
+          {
+          case 1:
+            num_node->val = (char)num_node->val;
+            break;
+          case 2:
+            num_node->val = (short)num_node->val;
+            break;
+          case 4:
+            num_node->val = (int)num_node->val;
+            break;
+          default:
+            break;
+          }
+        }
+        else
+        {
+          binary->rhs = new_cast_node(binary->rhs, binary->lhs->type);
+        }
       }
       node->type = binary->lhs->type;
       return;

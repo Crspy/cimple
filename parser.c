@@ -897,9 +897,16 @@ static Node *new_add(Node *lhs, Node *rhs, const Token *tok)
     rhs = tmp;
   }
 
-  // ptr + num
-  rhs = new_binary_node(NODE_MUL, rhs, new_long_num_node(lhs->type->base->size, tok),
-                        tok); // TODO: make this a right left (<<) by n instead
+  if (rhs->tag == NODE_TAG_NUM)
+  {
+    ((NumNode *)rhs)->val *= lhs->type->base->size;
+  }
+  else
+  {
+    // ptr + num
+    rhs = new_binary_node(NODE_MUL, rhs, new_long_num_node(lhs->type->base->size, tok),
+                          tok); // TODO: make this a right left (<<) by n instead
+  }
   return new_binary_node(NODE_ADD, lhs, rhs, tok);
 }
 
@@ -916,10 +923,17 @@ static Node *new_sub(Node *lhs, Node *rhs, const Token *tok)
   // ptr - num
   if (lhs->type->base && is_integer(rhs->type))
   {
-    rhs = new_binary_node(NODE_MUL,
-                          rhs,
-                          new_long_num_node(lhs->type->base->size, tok),
-                          tok); // TODO: make this a right left (<<) by n instead
+    if (rhs->tag == NODE_TAG_NUM)
+    {
+      ((NumNode *)rhs)->val *= lhs->type->base->size;
+    }
+    else
+    {
+      rhs = new_binary_node(NODE_MUL,
+                            rhs,
+                            new_long_num_node(lhs->type->base->size, tok),
+                            tok); // TODO: make this a right left (<<) by n instead
+    }
     add_type(rhs);
     Node *node = new_binary_node(NODE_SUB, lhs, rhs, tok);
     node->type = lhs->type;
@@ -1211,6 +1225,22 @@ static Node *postfix(const Token **rest, const Token *tok)
       node = struct_union_ref(node, tok);
       tok = consume(tok, TOKEN_IDENT);
       // tok = tok->next->next;
+      continue;
+    }
+
+    if (check(tok, TOKEN_PLUS_PLUS))
+    {
+      add_type(node);
+      node = new_unary_node(NODE_POST_INC, node, tok);
+      tok = consume(tok, TOKEN_PLUS_PLUS);
+      continue;
+    }
+
+    if (check(tok, TOKEN_MINUS_MINUS))
+    {
+      add_type(node);
+      node = new_unary_node(NODE_POST_DEC, node, tok);
+      tok = consume(tok, TOKEN_MINUS_MINUS);
       continue;
     }
 

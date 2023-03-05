@@ -24,8 +24,12 @@ struct Node
   const Token *tok;  // Representative token
 };
 
+const char* node_tag_to_str(enum NodeTag tag);
+
 typedef enum
 {
+  NODE_POST_INC,
+  NODE_POST_DEC,
   NODE_NEG,       // unary -
   NODE_ADDR,      // unary &
   NODE_DEREF,     // unary *
