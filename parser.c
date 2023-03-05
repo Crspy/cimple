@@ -41,6 +41,7 @@ struct Scope
 typedef struct
 {
   bool is_typedef;
+  bool is_static;
 } VarAttr;
 
 static Scope global_scope = {NULL};
@@ -238,7 +239,7 @@ static int64_t get_number(const Token *tok)
 }
 
 // declspec = ("void" | "_Bool" | "char" | "short" | "int" | "long"
-//             | "typedef"
+//             | "typedef" | "static"
 //             | struct-decl | union-decl | typedef-name | enum-specifier)+
 //
 // The order of typenames in a type-specifier doesn't matter. For
@@ -275,15 +276,22 @@ static Type *declspec(const Token **rest, const Token *tok, VarAttr *attr)
   while (is_typename(tok))
   {
 
-    // Handle "typedef" keyword
-    if (check(tok, TOKEN_TYPEDEF))
+    // Handle storage class specifiers
+    if (check(tok, TOKEN_TYPEDEF) || check(tok, TOKEN_STATIC))
     {
       if (!attr)
       {
-        error_tok(tok,
-                  "storage class specifier is not allowed in this context");
+        error_tok(tok, "storage class specifier is not allowed in this context");
       }
-      attr->is_typedef = true;
+
+      if (check(tok, TOKEN_TYPEDEF))
+        attr->is_typedef = true;
+      else
+        attr->is_static = true;
+
+      if (attr->is_typedef && attr->is_static)
+        error_tok(tok, "typedef and static may not be used together");
+
       tok = tok->next;
       continue;
     }
@@ -591,6 +599,7 @@ static bool is_typename(const Token *tok)
   case TOKEN_UNION:
   case TOKEN_TYPEDEF:
   case TOKEN_ENUM:
+  case TOKEN_STATIC:
     return true;
   default:
     return find_typedef(tok) != NULL;
@@ -1306,13 +1315,15 @@ static void create_param_lvars(Type *param)
   }
 }
 
-static const Token *function(const Token *tok, Type *base_type)
+static const Token *function(const Token *tok, Type *base_type,VarAttr* attr)
 {
   Type *type = declarator(&tok, tok, base_type);
 
   Obj *fn = new_gvar(type, get_ident(type->name), type->name->len);
   fn->is_function = true;
   fn->is_definition = !match(&tok, tok, TOKEN_SEMICOLON);
+  fn->is_static = attr->is_static;
+
   if (!fn->is_definition)
     return tok;
 
@@ -1382,7 +1393,7 @@ Obj *parse(const Token *tok)
     // Function
     if (is_function(tok))
     {
-      tok = function(tok, base_type);
+      tok = function(tok, base_type, &attr);
       continue;
     }
 
