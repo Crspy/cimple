@@ -456,6 +456,39 @@ static Token *read_char_literal(const char *start, size_t line_no,
   return tok;
 }
 
+static Token *read_int_literal(const char *start, size_t line_no,
+                               const char *line_start)
+{
+  const char *p = start;
+
+  int base = 10;
+  if (*p == '0')
+  {
+    if ((p[1] == 'x' || p[1] == 'X') && isalnum(p[2]))
+    {
+      p += 2;
+      base = 16;
+    }
+    else if ((p[1] == 'b' || p[1] == 'B') && isalnum(p[2]))
+    {
+      p += 2;
+      base = 2;
+    }
+    else
+    {
+      base = 8;
+    }
+  }
+
+  long val = strtoul(p,(char**) &p, base);
+  if (isalnum(*p))
+    error_at(p, "invalid digit");
+
+  Token *tok = new_token(TOKEN_NUM, line_no, line_start, start, p);
+  tok->val = val;
+  return tok;
+}
+
 // Tokenize `current_input` and returns new tokens.
 static Token *tokenize(const char *filename, const char *p)
 {
@@ -522,10 +555,8 @@ static Token *tokenize(const char *filename, const char *p)
     // Numeric literal
     if (isdigit(*p))
     {
-      cur = cur->next = new_token(TOKEN_NUM, line_no, line_start, p, p);
-      const char *num_start = p;
-      cur->val = strtoul(p, (char **)&p, 10);
-      cur->len = p - num_start;
+      cur = cur->next = read_int_literal(p,line_no,line_start);
+      p += cur->len;
       continue;
     }
 
