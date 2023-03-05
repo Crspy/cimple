@@ -782,13 +782,29 @@ static Node *assign(const Token **rest, const Token *tok)
     return new_binary_node(NODE_ASSIGN, node, assign(rest, tok->next), tok);
 
   if (check(tok, TOKEN_PLUS_EQUAL))
-    return new_binary_node(NODE_ASSIGN, node,new_add(node,assign(rest, tok->next), tok), tok);
+  {
+    Node *lhs = node;
+    Node *rhs = new_add(lhs, assign(rest, tok->next), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
   if (check(tok, TOKEN_MINUS_EQUAL))
-    return new_binary_node(NODE_ASSIGN, node, new_sub(node,assign(rest, tok->next), tok), tok);
+  {
+    Node *lhs = node;
+    Node *rhs = new_sub(lhs, assign(rest, tok->next), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
   if (check(tok, TOKEN_STAR_EQUAL))
-    return new_binary_node(NODE_ASSIGN, node, new_binary_node(NODE_MUL, node, assign(rest, tok->next), tok), tok);
+  {
+    Node *lhs = node;
+    Node *rhs = new_binary_node(NODE_MUL, lhs, assign(rest, tok->next), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
   if (check(tok, TOKEN_SLASH_EQUAL))
-    return new_binary_node(NODE_ASSIGN, node, new_binary_node(NODE_DIV, node, assign(rest, tok->next), tok), tok);
+  {
+    Node *lhs = node;
+    Node *rhs = new_binary_node(NODE_DIV, lhs, assign(rest, tok->next), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
 
   *rest = tok;
   return node;
@@ -995,6 +1011,7 @@ static Node *cast(const Token **rest, const Token *tok)
 }
 
 // unary = ("+" | "-" | "*" | "&") cast
+//       | ("++" | "--") unary
 //       | postfix
 static Node *unary(const Token **rest, const Token *tok)
 {
@@ -1007,6 +1024,22 @@ static Node *unary(const Token **rest, const Token *tok)
     return new_unary_node(NODE_ADDR, cast(rest, tok->next), tok);
   if (check(tok, TOKEN_STAR))
     return new_unary_node(NODE_DEREF, cast(rest, tok->next), tok);
+
+  // Read ++i as i+=1
+  if (check(tok, TOKEN_PLUS_PLUS))
+  {
+    Node *lhs = unary(rest, tok->next);
+    Node *rhs = new_add(lhs, new_num_node(1, tok), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
+
+  // Read --i as i-=1
+  if (check(tok, TOKEN_MINUS_MINUS))
+  {
+    Node *lhs = unary(rest, tok->next);
+    Node *rhs = new_sub(lhs, new_num_node(1, tok), tok);
+    return new_binary_node(NODE_ASSIGN, lhs, rhs, tok);
+  }
 
   return postfix(rest, tok);
 }
