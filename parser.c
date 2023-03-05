@@ -651,7 +651,19 @@ static Node *stmt(const Token **rest, const Token *tok)
 
     tok = consume(tok->next, TOKEN_LEFT_PAREN);
 
-    Node *init_expr = expr_stmt(&tok, tok);
+    enter_scope();
+
+    Node *init_expr;
+    if (is_typename(tok))
+    {
+      Type *base_type = declspec(&tok, tok, NULL);
+      init_expr = (Node *)declaration(&tok, tok, base_type);
+    }
+    else
+    {
+      init_expr = expr_stmt(&tok, tok);
+    }
+
     Node *cond_expr;
     if (!check(tok, TOKEN_SEMICOLON))
       cond_expr = expr(&tok, tok);
@@ -670,6 +682,7 @@ static Node *stmt(const Token **rest, const Token *tok)
     Node *body_stmt = stmt(rest, tok);
 
     Node *node = new_for_node(init_expr, cond_expr, inc_expr, body_stmt, start);
+    leave_scope();
     return node;
   }
   if (check(tok, TOKEN_WHILE))
@@ -1315,7 +1328,7 @@ static void create_param_lvars(Type *param)
   }
 }
 
-static const Token *function(const Token *tok, Type *base_type,VarAttr* attr)
+static const Token *function(const Token *tok, Type *base_type, VarAttr *attr)
 {
   Type *type = declarator(&tok, tok, base_type);
 
